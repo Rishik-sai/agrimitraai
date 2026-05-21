@@ -155,3 +155,9 @@ agrimitraai/
     │   └── main.jsx
     └── package.json
 ```
+
+---
+
+## 👨‍💻 Profile
+[Rishik-sai](https://github.com/Rishik-sai)
+
