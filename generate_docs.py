@@ -41,11 +41,11 @@ def generate_document():
     table = doc.add_table(rows=5, cols=2)
     table.alignment = WD_ALIGN_PARAGRAPH.CENTER
     table.cell(0,0).text = 'Author:'
-    table.cell(0,1).text = 'istyl'
+    table.cell(0,1).text = 'Rishik-sai'
     table.cell(1,0).text = 'Tech Stack:'
     table.cell(1,1).text = 'FastAPI, React (Vite), Groq API, FAISS, LangChain'
     table.cell(2,0).text = 'GitHub Repository:'
-    table.cell(2,1).text = 'https://github.com/istyl/agrimitraai'
+    table.cell(2,1).text = 'https://github.com/Rishik-sai/agrimitraai'
     table.cell(3,0).text = 'Date:'
     table.cell(3,1).text = '2026-05-26'
     table.cell(4,0).text = 'Version:'
@@ -303,3 +303,4 @@ npm run dev''', language='bash')
 
 if __name__ == '__main__':
     generate_document()
+
