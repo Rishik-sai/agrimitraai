@@ -1,37 +1,7 @@
-# Environment variables / Secrets
-.env
-backend/.env
-*.env
+# Standard Gitignore
 
-# Python files
+# Python
 __pycache__/
-backend/__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-venv/
-backend/venv/
-.venv/
-env/
-bin/
-lib/
-include/
+*.py[cod]
+*.class
 
-# Node / JS
-node_modules/
-frontend/node_modules/
-dist/
-frontend/dist/
-.eslintcache
-
-# Local IDE and System files
-.vscode/
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-.DS_Store
-Thumbs.db
