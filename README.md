@@ -5,13 +5,6 @@ AgriMitra AI Pro is a state-of-the-art agricultural advisory system designed to 
 
 ---
 
-
-
-### Suggested GitHub Repository Topics/Tags
-`agriculture-ai` • `multi-rag` • `fastapi` • `react` • `langchain` • `groq-api` • `faiss` • `multilingual-ai` • `computer-vision` • `farmers-app` • `disease-detection` • `rag-agents`
-
----
-
 ## ✨ Core Features
 
 1. **🌾 5 Specialized RAG Agents**:
