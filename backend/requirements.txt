@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+langchain>=0.2.0
+langchain-community>=0.2.0
+langchain-text-splitters>=0.2.0
+langchain-groq>=0.1.0
+faiss-cpu>=1.7.0
+sentence-transformers>=2.2.0
+python-dotenv>=1.0.0
+pdfminer.six>=20221105
+pydantic>=2.0.0

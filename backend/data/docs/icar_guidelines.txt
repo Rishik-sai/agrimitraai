@@ -1,0 +1,62 @@
+AGRICULTURE ADVISORY DOCUMENT: ICAR & STATE DEPARTMENTS OF INDIA (2025-2026)
+
+CROP: Paddy (Rice)
+DISEASE: Rice Blast (Magnaporthe oryzae)
+SYMPTOMS: Spindle-shaped spots on leaves with dark reddish-brown margins and grey/whitish centers. Under severe infestation, spots coalesce to kill the leaf blade. Neck rot occurs during flowering where the neck of the panicle becomes blackish, leading to chaffy grains and lodging.
+CHEMICAL REMEDY: Spray Tricyclazole 75% WP @ 0.6 grams per liter of water OR Isoprothiolane 40% EC @ 1.5 ml per liter of water. Ensure thorough coverage. Avoid excess application of Nitrogenous fertilizers.
+ORGANIC REMEDY: Foliar spray of Pseudomonas fluorescens formulation @ 5g per liter. Incorporate organic compost and silicon-rich materials like rice husk ash to strengthen plant tissue against spore penetration.
+SAFETY PRECAUTIONS: Wear personal protective equipment (PPE) including chemical-resistant gloves, protective eye goggles, and a respiratory mask. Never spray against the wind direction. Maintain a 14-day pre-harvest interval (PHI) after chemical spray. Keep children and livestock away from treated fields.
+MARKET PRICE INFO: Paddy (Common) Minimum Support Price (MSP) is set at ₹2,183 per Quintal. Premium grades command ₹2,450 per Quintal in Guntur and Thanjavur mandis. 
+STORAGE STRATEGY: Dry paddy grains to under 13.5% moisture level before storage. Use hermetic storage bags (such as Super Bags) on elevated wooden pallets in clean, ventilated warehouses to prevent mold, Aspergillus growth, and weevil attack.
+
+CROP: Cotton
+PEST: Pink Bollworm (Pectinophora gossypiella)
+SYMPTOMS: Rosette shape in flowers due to larvae binding the petals together; hollowed out seeds in green bolls; premature boll opening with stained, poor-quality lint. Inter-locule boring inside bolls is visible.
+CHEMICAL REMEDY: For monitoring, deploy pheromone traps @ 5 traps per acre. If infestation exceeds economic threshold (ETL) of 5 moths/trap/day, spray Profenophos 50% EC @ 2 ml per liter of water OR Emamectin Benzoate 5% SG @ 0.4 grams per liter. Do not use banned Monocrotophos or endosulfan compounds.
+ORGANIC REMEDY: Release predatory Trichogramma bactrae parasites @ 60,000 per acre weekly during flower formation. Spray Neem Oil (1500 ppm) @ 5 ml per liter of water at early stages. Maintain crop sanitation by destroying cotton stubble.
+SAFETY PRECAUTIONS: Wear personal protective equipment (PPE) including protective suit, mask, and boots. Wash hands and face with soap immediately after spraying. Never smoke, eat, or drink while handling pesticides.
+MARKET PRICE INFO: Cotton (Long Staple) Minimum Support Price (MSP) is set at ₹6,620 per Quintal. Local mandi prices range from ₹6,800 to ₹7,500 in Warangal, Adoni, and Coimbatore cotton markets.
+STORAGE STRATEGY: Ensure cotton bales are stored in dry, well-ventilated sheds on raised platforms. Lint must not contact moisture as it leads to staining and microbial deterioration.
+
+CROP: Groundnut
+DISEASE: Tikka Leaf Spot (Cercospora arachidicola)
+SYMPTOMS: Circular dark brown spots on the upper leaf surface, surrounded by a bright yellow halo. Leaf defoliation occurs under heavy infection, causing severe reduction in pod weight.
+CHEMICAL REMEDY: Spray Carbendazim 12% + Mancozeb 63% WP @ 2.0 grams per liter of water. Ensure spraying covers the lower surfaces of leaves.
+ORGANIC REMEDY: Spray 5% Neem Seed Kernel Extract (NSKE) at fortnightly intervals. Perform seed treatment with Trichoderma viride @ 4 grams per kg of seeds before sowing.
+SAFETY PRECAUTIONS: Wear PPE. Ensure proper mask ventilation. Avoid skin contact with fungicides. Dispose of empty chemical containers safely by crushing and burying deep in wasteland.
+MARKET PRICE INFO: Groundnut Minimum Support Price (MSP) is ₹6,377 per Quintal. Mandi prices average ₹6,500 - ₹7,200 in Anantapur and Dharwad APMC yards.
+STORAGE STRATEGY: Dry pods to less than 8% moisture. Store in clean gunny bags stacked on wooden pallets in a cool, dry place. Ensure low humidity to prevent Aflatoxin contamination by Aspergillus flavus.
+
+CROP: Chillies
+DISEASE: Chilli Leaf Curl Virus (ChiLCV)
+SYMPTOMS: Leaves curl upward, showing cup-like shape, puckered veins, and reduced leaf size. Severely infected plants are stunted, with high rate of flower drop and deformed pods.
+CHEMICAL REMEDY: Controlled by managing the Whitefly vector (Bemisia tabaci). Install Yellow Sticky Traps @ 10 per acre. Spray Imidacloprid 17.8% SL @ 0.3 ml per liter of water OR Acetamiprid 20% SP @ 0.2 grams per liter. Do not mix incompatible pesticides.
+ORGANIC REMEDY: Spray Neem Oil (3000 ppm) @ 3 ml per liter of water. Grow border crops like Maize or Sorghum (4 rows) around chilli fields to block whitefly migrations. Apply vermicompost for root vigor.
+SAFETY PRECAUTIONS: Wear gloves, protective eyewear, and face shield. Wash all spraying equipment after use. Do not release chemical washings into local water channels.
+MARKET PRICE INFO: Spices Board MSP benchmark is set around ₹7,000 per Quintal. Actual mandi prices for high-grade dry red Guntur chilli range between ₹16,000 and ₹22,000 per Quintal.
+STORAGE STRATEGY: Sun-dry red chillies to 10% moisture content. Use cold storage (temperature 4-10°C, relative humidity 60-70%) to preserve capsaicin content and bright red color for premium export pricing.
+
+CROP: Maize
+PEST: Fall Armyworm (Spodoptera frugiperda)
+SYMPTOMS: Ragged leaves with large, irregular holes; heavy fecal deposits (brown frass) inside the leaf whorls; feeding damage on tassels and developing maize cobs. Growing point can be destroyed in young seedlings.
+CHEMICAL REMEDY: Spray Chlorantraniliprole 18.5% SC @ 0.4 ml per liter of water OR Emamectin Benzoate 5% SG @ 0.4 grams per liter. Direct the nozzle spray directly into the whorl of the crop.
+ORGANIC REMEDY: Apply a mixture of fine sand and wood ash (9:1 ratio) directly into the whorls of infested plants. Conserve natural predators such as earwigs and ladybird beetles. Use light traps to trap moths.
+SAFETY PRECAUTIONS: Always wear gloves, goggles, and overalls. Avoid inhaling fine spray mist. Bathe and change clothes after handling crop chemicals.
+MARKET PRICE INFO: Maize MSP is ₹2,090 per Quintal. Active mandi pricing ranges from ₹2,100 to ₹2,350 in Kurnool and Karimnagar grain markets.
+STORAGE STRATEGY: Fumigate storage bins prior to loading. Maintain grain moisture content under 12% to prevent Aspergillus mold growth and grain weevil infestations.
+
+CROP: Millets (Bajra and Ragi)
+PEST: Shoot Fly (Atherigona approximata)
+SYMPTOMS: The maggot enters the seedling and cuts the growing point, causing "dead heart" symptoms in early growth stages (1-4 weeks). Affected plants produce excessive tillering but lower yields.
+CHEMICAL REMEDY: Seed treatment with Imidacloprid 70% WS @ 5 grams per kg of seed before sowing. If infestation crosses 10%, spray Cypermethrin 10% EC @ 1 ml per liter of water.
+ORGANIC REMEDY: Early sowing within 7-10 days of the monsoon onset helps avoid peak shoot fly incidence. Use higher seed rates to compensate for seedling loss. Spray 5% NSKE (Neem Seed Kernel Extract) at 14 days after emergence.
+SAFETY PRECAUTIONS: Follow strict seed treatment safety using thick rubber gloves. Do not allow livestock to graze on young treated millet crops for at least 30 days.
+MARKET PRICE INFO: Bajra MSP is ₹2,500/Quintal; Ragi MSP is ₹3,846/Quintal. High demand due to "Shree Anna" initiative.
+STORAGE STRATEGY: Thoroughly dry the grains to below 10% moisture before bagging. Ragi can be stored for years without severe pest damage if kept dry.
+
+SECTION: PRECISION AGRICULTURE AND NANO-FERTILIZERS
+TECHNOLOGY: Agricultural Drone Spraying (Nano-Urea & Nano-DAP)
+APPLICATION GUIDELINES: Conventional granular urea leads to high nitrogen loss via leaching. Farmers are advised to replace 1 bag of conventional Urea with 1 bottle (500ml) of IFFCO Nano-Urea liquid.
+MIXING RATIO: Mix 2-4 ml of Nano-Urea or Nano-DAP per liter of water.
+DRONE DEPLOYMENT: For uniform coverage, use agricultural drones (available via Namo Drone Didi rentals). Maintain a flying height of 1.5 to 2 meters above the crop canopy. Spray during early morning or late afternoon to avoid evaporation losses.
+BENEFITS: Improves crop yield by 8-10%, reduces groundwater nitrate pollution, and significantly lowers transportation costs compared to bulk fertilizer bags.

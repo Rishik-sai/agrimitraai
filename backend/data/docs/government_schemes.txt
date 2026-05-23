@@ -1,0 +1,81 @@
+GOVERNMENT AGRICULTURAL SCHEMES AND SUBSIDIES — INDIA 2025-2026
+
+SCHEME: PM-KISAN (Pradhan Mantri Kisan Samman Nidhi)
+TYPE: Direct Benefit Transfer (DBT)
+ELIGIBILITY: All landholding farmer families across India, subject to exclusion criteria (institutional landholders, income tax payers, constitutional post holders excluded).
+BENEFIT: ₹6,000 per year in 3 equal installments of ₹2,000 each, directly transferred to the farmer's Aadhaar-linked bank account.
+HOW TO APPLY: Register through the PM-KISAN portal (pmkisan.gov.in) or visit the nearest Common Service Centre (CSC). Documents required: Aadhaar card, bank passbook, and land ownership records. State nodal officers verify applications within 30 days.
+STATUS CHECK: Beneficiaries can check payment status on the portal using Aadhaar number or mobile number.
+
+SCHEME: RYTHU BHAROSA (Andhra Pradesh State Scheme)
+TYPE: State Investment Support
+ELIGIBILITY: All farmers in Andhra Pradesh holding agricultural land, including tenant farmers with proper documentation.
+BENEFIT: ₹13,500 per year per farmer family (₹7,500 from state + ₹6,000 from PM-KISAN). Paid in installments before each crop season to support input costs.
+HOW TO APPLY: Apply at the Village/Ward Secretariat. Documents: Aadhaar, bank details, land pattadar passbook or tenant agreement verified by Village Revenue Officer (VRO).
+
+SCHEME: RYTHU BANDHU (Telangana State Scheme)
+TYPE: State Investment Support
+ELIGIBILITY: All landholding farmers in Telangana state.
+BENEFIT: ₹10,000 per acre per year (₹5,000 per season for Kharif and Rabi), transferred directly to bank accounts before sowing season.
+HOW TO APPLY: Automatic enrollment based on land records (Dharani portal). Farmers should ensure their pattadar passbook details are updated on the Dharani portal. Contact Mandal Revenue Office for corrections.
+
+SCHEME: PMFBY (Pradhan Mantri Fasal Bima Yojana)
+TYPE: Crop Insurance
+ELIGIBILITY: All farmers (loanee and non-loanee) growing notified crops in notified areas. Voluntary for non-loanee farmers since Kharif 2020.
+BENEFIT: Insurance coverage against crop loss due to natural calamities, pests, and diseases. Premium: 2% for Kharif crops, 1.5% for Rabi crops, and 5% for commercial/horticultural crops. Balance premium paid by Central and State governments equally.
+HOW TO APPLY: Through bank branches (for loanee farmers, automatic), or through CSC/insurance company agents. Download the 'Meri Fasal Mera Byora' or 'PMFBY' mobile app. Deadline: 7 days before the cut-off date notified for each season.
+CLAIM PROCESS: Report crop loss within 72 hours through the Crop Insurance App, toll-free number 1800-XXX-XXXX, or nearest bank branch. Insurance company conducts Crop Cutting Experiments (CCE) for yield estimation.
+
+SCHEME: KCC (Kisan Credit Card)
+TYPE: Agricultural Credit
+ELIGIBILITY: All farmers — individual/joint borrowers who are owner cultivators, tenant farmers, sharecroppers, or self-help groups (SHGs).
+BENEFIT: Short-term crop loans up to ₹3 lakh at 4% interest rate (after government subsidies of 5% — 2% from GoI + 3% for prompt repayment). Also covers post-harvest expenses, farm maintenance, and allied activities. Includes personal accident insurance of ₹50,000 and ₹25,000 for death and disability respectively.
+HOW TO APPLY: Apply at any scheduled commercial bank, cooperative bank, or Regional Rural Bank (RRB). Documents: Land records, Aadhaar, passport photo, and crop sowing certificate from Village Revenue Officer.
+
+SCHEME: SOIL HEALTH CARD (SHC) SCHEME
+TYPE: Soil Testing and Advisory
+ELIGIBILITY: All farmers across India. Free of charge.
+BENEFIT: Government collects soil samples from farms and provides a Soil Health Card every 2 years. The card contains: soil nutrient status (N, P, K, S, Zn, Fe, Cu, Mn, B), soil pH, EC, organic carbon, and crop-specific fertilizer recommendations. Helps farmers optimize fertilizer use and improve yields.
+HOW TO APPLY: Contact nearest Krishi Vigyan Kendra (KVK) or Agriculture Department office. Soil samples are collected in a grid pattern at the village level. Cards are generated at district-level soil testing laboratories.
+
+SCHEME: e-NAM (National Agriculture Market)
+TYPE: Electronic Trading Platform
+ELIGIBILITY: All farmers with produce to sell. Over 1,000 mandis integrated across 18 states and 3 UTs.
+BENEFIT: Transparent price discovery through online competitive bidding. Farmers can see real-time bids from multiple traders. Reduces middleman exploitation. Payment directly to bank accounts. Quality assaying at mandi gates ensures fair grading.
+HOW TO APPLY: Register at any e-NAM enabled APMC mandi with Aadhaar, bank details, and mobile number. Use the e-NAM mobile app to track bids and payments.
+
+SCHEME: MICRO IRRIGATION FUND (PMKSY - Per Drop More Crop)
+TYPE: Irrigation Subsidy
+ELIGIBILITY: All farmers for drip and sprinkler irrigation systems. Higher subsidy for small and marginal farmers, SC/ST farmers.
+BENEFIT: 55% subsidy for small and marginal farmers, 45% for other farmers on the total cost of micro-irrigation systems (drip, sprinkler, rain gun). State top-up subsidies may provide additional 10-25%.
+HOW TO APPLY: Apply through the state agriculture department or horticulture department. Online portals available in most states. Select empanelled vendors for system installation.
+
+SCHEME: NATIONAL MISSION ON SUSTAINABLE AGRICULTURE (NMSA)
+TYPE: Climate Resilience
+ELIGIBILITY: Farmers in rainfed and climate-vulnerable regions.
+BENEFIT: Support for climate-resilient practices including organic farming, conservation agriculture, water harvesting structures, and drought/flood resistant crop varieties. Financial assistance ranges from ₹10,000 to ₹50,000 per hectare depending on the intervention.
+HOW TO APPLY: Through District Agriculture Officer (DAO) or state agriculture department portal. Priority given to drought-prone and flood-prone districts.
+
+SCHEME: NATIONAL HORTICULTURE MISSION (NHM)
+TYPE: Horticulture Development
+ELIGIBILITY: Farmers growing fruits, vegetables, flowers, spices, plantation crops, and medicinal plants.
+BENEFIT: Subsidies for establishment of new orchards (up to ₹60,000/ha for fruits), protected cultivation (50% subsidy up to ₹56 lakh for hi-tech greenhouses), post-harvest infrastructure (cold storage, pack houses), and organic certification costs.
+HOW TO APPLY: Apply through the District Horticulture Officer or NHM portal. Requires project report for larger interventions.
+
+SCHEME: NAMO DRONE DIDI
+TYPE: Technology & Women Empowerment
+ELIGIBILITY: Women Self Help Groups (SHGs) registered under NRLM (National Rural Livelihood Mission).
+BENEFIT: Provides agricultural drones to 15,000 women SHGs for providing rental services to farmers for agriculture purposes (nano fertilizer and pesticide spraying). Subsidy up to 80% of the cost of the drone or a maximum of ₹8 lakh.
+HOW TO APPLY: SHGs can apply through the state rural livelihood mission offices. One member receives 15-day drone pilot training.
+
+SCHEME: PM-PRANAM (PM Programme for Restoration, Awareness, Nourishment and Amelioration of Mother Earth)
+TYPE: Fertilizer Management & Subsidies
+ELIGIBILITY: State governments and indirectly all farmers.
+BENEFIT: Incentivizes States to reduce the use of chemical fertilizers by adopting alternative nutrients like Nano-Urea and Nano-DAP. Subsidies are repurposed to support bio-fertilizer production units and farmers adopting sustainable organic inputs.
+HOW TO APPLY: Implemented at the state level. Farmers can access subsidized Nano-fertilizers at IFFCO centers and Primary Agricultural Credit Societies (PACS).
+
+SCHEME: AGRI-STACK (DIGITAL PUBLIC INFRASTRUCTURE FOR AGRICULTURE)
+TYPE: Digital Farmer Identity & Services
+ELIGIBILITY: All landholding farmers.
+BENEFIT: Creation of a unified 'Farmer ID' linked to Aadhaar and digitized land records (Bhu-Aadhaar). Enables frictionless, paperless access to credit (KCC), crop insurance (PMFBY), and direct benefit transfers without repetitive documentation.
+HOW TO APPLY: Farmers must ensure their e-KYC is complete on the PM-KISAN portal and land records are digitally linked in their respective state revenue portals.
