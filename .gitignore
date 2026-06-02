@@ -52,3 +52,6 @@ cover/
 *.mo
 *.pot
 
+instance/
+.webassets-cache
+
