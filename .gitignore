@@ -55,3 +55,8 @@ cover/
 instance/
 .webassets-cache
 
+.scrapy
+docs/_build/
+.pybuilder/
+target/
+
