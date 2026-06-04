@@ -60,3 +60,7 @@ docs/_build/
 .pybuilder/
 target/
 
+.ipynb_checkpoints
+profile_default/
+ipython_config.py
+
