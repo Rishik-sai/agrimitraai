@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
-// Fallback agent data in case the API isn't running
 const FALLBACK_AGENTS = [
   { id: 'crop_advisor', name: 'Crop Advisor', emoji: '🌾', description: 'Diseases, pests, remedies & cultivation' },
   { id: 'market_analyst', name: 'Market Analyst', emoji: '📊', description: 'MSP, mandi prices & demand trends' },
@@ -9,8 +10,24 @@ const FALLBACK_AGENTS = [
   { id: 'leaf_scanner', name: 'Leaf Scanner', emoji: '🔬', description: 'Plant disease identification' },
 ];
 
-export default function AgentGrid({ activeAgent, onSelectAgent, t, language }) {
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
+
+export default function AgentGrid({ t, language }) {
   const [agents, setAgents] = useState(FALLBACK_AGENTS);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetch(`/api/agents?lang=${language || 'en'}`)
@@ -21,46 +38,63 @@ export default function AgentGrid({ activeAgent, onSelectAgent, t, language }) {
         }
       })
       .catch(() => {
-        // Use fallback data
+        // Use fallback
       });
   }, [language]);
-
-  const handleClick = (agentId) => {
-    if (activeAgent === agentId) {
-      onSelectAgent(null); // Deselect
-    } else {
-      onSelectAgent(agentId);
-    }
-  };
 
   const getTranslatedName = (agentId, fallbackName) => {
     const key = 'agent' + agentId.split('_')[0].charAt(0).toUpperCase() + agentId.split('_')[0].slice(1);
     return t[key] || fallbackName;
   };
 
+  const handleClick = (agentId) => {
+    if (agentId === 'leaf_scanner') {
+      navigate('/scanner');
+    } else {
+      navigate(`/chat/${agentId}`);
+    }
+  };
+
   return (
-    <div className="agent-grid-section glass">
-      <h2 className="agent-grid-title">🤖 {t.agentsAll}</h2>
-      <div className="agent-grid">
+    <div className="page-container">
+      <motion.div 
+        className="hero-section"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <h1 className="page-title">{t.agentsAll || 'Select an AI Agent'}</h1>
+        <p className="page-subtitle">Choose a specialized assistant to help you with your farming needs today.</p>
+      </motion.div>
+
+      <motion.div 
+        className="agent-grid-full"
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+      >
         {agents.map((agent) => (
-          <div
+          <motion.div
             key={agent.id}
-            className={`agent-card glass ${activeAgent === agent.id ? 'active' : ''}`}
+            className="agent-card-large glass-panel"
+            variants={itemVariants}
+            whileHover={{ scale: 1.03, translateY: -5, boxShadow: "0 20px 40px rgba(0,0,0,0.4)" }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => handleClick(agent.id)}
             role="button"
             tabIndex={0}
-            id={`agent-${agent.id}`}
           >
-            <div className="agent-emoji">{agent.emoji}</div>
-            <div className="agent-name">{getTranslatedName(agent.id, agent.name)}</div>
-            <div className="agent-desc">{agent.description}</div>
-            <div className="agent-status">
-              <span className="agent-status-dot"></span>
-              Online
+            <div className="agent-card-header">
+              <div className="agent-emoji-large">{agent.emoji}</div>
+              <div className="agent-status-indicator">
+                <span className="status-dot pulsing"></span> Online
+              </div>
             </div>
-          </div>
+            <h3 className="agent-name-large">{getTranslatedName(agent.id, agent.name)}</h3>
+            <p className="agent-desc-large">{agent.description}</p>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 }

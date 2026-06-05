@@ -34,7 +34,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import the Multi-RAG engine
-from multi_rag import get_answer, get_all_agents
+from multi_rag import get_all_agents
 
 app = FastAPI(
     title="AgriMitra AI Pro",
@@ -164,25 +164,30 @@ class ChatResponse(BaseModel):
     agents_used: list
 
 
+from fastapi.responses import StreamingResponse
+
 # ---------------------------------------------------------------------------
-# Chat Endpoint (Multi-RAG)
+# Chat Endpoint (Multi-RAG with Streaming)
 # ---------------------------------------------------------------------------
-@app.post("/api/chat", response_model=ChatResponse)
+@app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
     """Handle a chat query using the Multi-RAG pipeline.
-    Routes the query to specialized agents, retrieves context, and synthesizes an answer.
+    Routes the query to specialized agents, retrieves context (and live web search),
+    and streams the synthesized answer via Server-Sent Events (SSE).
     """
     logger.info(f"Chat request: {request.query[:80]}... Language: {request.language}")
     try:
         lang_full = LANG_MAP.get(request.language, "English")
-        result = get_answer(request.query, language=lang_full)
-        return ChatResponse(
-            answer=result["answer"],
-            sources=result["sources"],
-            agents_used=result["agents_used"],
+        
+        # We must import stream_answer here or at top level
+        from multi_rag import stream_answer
+        
+        return StreamingResponse(
+            stream_answer(request.query, language=lang_full),
+            media_type="text/event-stream"
         )
     except Exception as e:
-        logger.error(f"Chat error: {e}", exc_info=True)
+        logger.error(f"Chat streaming error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
 
 

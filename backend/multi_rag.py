@@ -5,21 +5,16 @@ Implements a multi-agent RAG (Retrieval-Augmented Generation) architecture with
 5 specialized agents that route, retrieve, and synthesize answers from domain-specific
 knowledge bases.
 
-Agents:
-  1. Crop Advisor      — diseases, pests, remedies, cultivation practices
-  2. Market Analyst    — MSP, mandi prices, demand, storage, export
-  3. Schemes Expert    — government schemes, subsidies, eligibility, applications
-  4. Weather Analyst   — seasonal advisories, weather risks, climate management
-  5. Leaf Scanner      — disease identification from symptom descriptions
-
-Architecture:
-  Query → Router → [Selected Agents] → Parallel Retrieval → Synthesizer → Response
+Now augmented with Corrective RAG (CRAG) using DuckDuckGo for live web search
+and streaming response support.
 """
 
 import os
+import json
 import logging
+import asyncio
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, AsyncGenerator
 from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
@@ -34,7 +29,7 @@ logger = logging.getLogger(__name__)
 FAISS_INDEX_PATH = Path(__file__).parent / "faiss_index"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
-# Try to load Google Gemini; fall back to a simple echo if unavailable
+# Try to load Google Gemini/Groq; fall back to a simple echo if unavailable
 LLM_AVAILABLE = False
 LLM = None
 EMBEDDINGS = None
@@ -131,7 +126,7 @@ AGENTS: Dict[str, AgentConfig] = {
             "buy", "demand", "supply", "export", "import", "trade",
             "quintal", "ton", "rupee", "₹", "storage", "warehouse",
             "cold storage", "apmc", "e-nam", "procurement", "profit",
-            "income", "revenue", "value", "premium", "grade",
+            "income", "revenue", "value", "premium", "grade", "today", "live"
         ],
         retrieval_k=4,
     ),
@@ -160,7 +155,7 @@ AGENTS: Dict[str, AgentConfig] = {
             "cold", "frost", "hail", "cyclone", "flood", "drought",
             "season", "kharif", "rabi", "zaid", "summer", "winter",
             "climate", "wind", "humidity", "forecast", "advisory",
-            "risk", "hazard", "storm", "warning",
+            "risk", "hazard", "storm", "warning", "today", "tomorrow"
         ],
         retrieval_k=4,
     ),
@@ -184,11 +179,7 @@ AGENTS: Dict[str, AgentConfig] = {
 # Router — Classify query into agent domains
 # ---------------------------------------------------------------------------
 def route_query(query: str) -> List[str]:
-    """Route a query to the most relevant agents using keyword matching.
-
-    Returns a list of agent IDs sorted by relevance score (highest first).
-    Always returns at least one agent (crop_advisor as default).
-    """
+    """Route a query to the most relevant agents using keyword matching."""
     query_lower = query.lower()
     scores: Dict[str, int] = {}
 
@@ -198,14 +189,11 @@ def route_query(query: str) -> List[str]:
             scores[agent_id] = score
 
     if not scores:
-        # Default to crop_advisor if no keywords match
         return ["crop_advisor"]
 
-    # Sort by score descending, take top 3 agents
     sorted_agents = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     top_agents = [agent_id for agent_id, _score in sorted_agents[:3]]
-
-    logger.info(f"Routed query to agents: {top_agents} (scores: {dict(sorted_agents[:3])})")
+    logger.info(f"Routed query to agents: {top_agents}")
     return top_agents
 
 
@@ -213,17 +201,12 @@ def route_query(query: str) -> List[str]:
 # Agent Retrieval — Each agent retrieves from the shared FAISS index
 # ---------------------------------------------------------------------------
 def agent_retrieve(agent_id: str, query: str) -> List[Dict]:
-    """Retrieve relevant document chunks for a specific agent.
-
-    Returns a list of dicts with 'content', 'source', and 'agent' fields.
-    """
+    """Retrieve relevant document chunks for a specific agent."""
     _init_components()
-
     config = AGENTS[agent_id]
     results = []
 
     if VECTORDB is None:
-        logger.warning("No vector store available. Returning empty results.")
         return results
 
     try:
@@ -241,33 +224,57 @@ def agent_retrieve(agent_id: str, query: str) -> List[Dict]:
 
 
 # ---------------------------------------------------------------------------
-# Synthesizer — Merge multi-agent results into a coherent answer
+# Corrective RAG (Web Search Augmentation)
+# ---------------------------------------------------------------------------
+def augment_with_web_search(query: str, all_sources: set) -> str:
+    """Use DuckDuckGo to fetch live web data for up-to-date prices, news, or missing context."""
+    try:
+        from duckduckgo_search import DDGS
+        logger.info(f"Augmenting context with DuckDuckGo search for: {query}")
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=4))
+            if not results:
+                return ""
+            
+            web_context = "\n--- 🌐 Live Web Search (Corrective RAG) ---\n"
+            for r in results:
+                source_domain = r.get('href', 'web').split('/')[2] if 'href' in r else 'web'
+                all_sources.add(source_domain)
+                web_context += f"[Source: {source_domain}]\n{r.get('body', '')}\n\n"
+            return web_context
+    except Exception as e:
+        logger.error(f"DuckDuckGo search failed: {e}")
+        return ""
+
+
+# ---------------------------------------------------------------------------
+# Synthesizer — Merge multi-agent results and Stream Answer
 # ---------------------------------------------------------------------------
 SYNTHESIS_PROMPT = """You are AgriMitra AI, an expert agricultural assistant serving Indian farmers.
-You have received information from multiple specialized agents. Synthesize their findings into
-a single, clear, actionable answer.
+You have received information from specialized agents and live web search results.
+Synthesize their findings into a single, clear, actionable answer.
 
 AGENTS CONSULTED: {agents_consulted}
 
-RETRIEVED CONTEXT:
+RETRIEVED CONTEXT (Local DB & Live Web):
 {context}
 
 USER QUESTION: {question}
 
 INSTRUCTIONS:
-1. Provide a comprehensive answer using ONLY the retrieved context above.
-2. Cite sources in square brackets, e.g., [icar_guidelines.txt].
-3. Organize your answer with clear sections if multiple topics are covered.
-4. Include specific numbers (prices, dosages, dates) when available.
-5. If the context doesn't contain enough information, say so honestly.
-6. Keep the tone helpful and practical for farmers.
+1. Provide a comprehensive answer using the retrieved context above.
+2. If the retrieved context doesn't contain the exact answer, use your own general knowledge to assist the user, but specify what is from your knowledge.
+3. Cite sources in square brackets if used, e.g., [icar_guidelines.txt] or [domain.com].
+4. Organize your answer with clear sections if multiple topics are covered.
+5. Include specific numbers (prices, dosages, dates) when available.
+6. Keep the tone helpful and practical.
 7. CRITICAL: You must provide the final answer entirely in the following language: {language}.
 
 ANSWER:"""
 
 
-def synthesize_answer(query: str, agent_results: Dict[str, List[Dict]], agents_used: List[str], language: str = "English") -> str:
-    """Synthesize retrieved chunks from multiple agents into a final answer."""
+async def synthesize_answer_stream(query: str, agent_results: Dict[str, List[Dict]], agents_used: List[str], all_sources: set, language: str = "English") -> AsyncGenerator[str, None]:
+    """Synthesize retrieved chunks and web search into a streaming final answer."""
     _init_components()
 
     # Build context from all agent results
@@ -276,17 +283,21 @@ def synthesize_answer(query: str, agent_results: Dict[str, List[Dict]], agents_u
         config = AGENTS[agent_id]
         chunks = agent_results.get(agent_id, [])
         if chunks:
-            agent_context = f"\n--- {config.emoji} {config.name} ---\n"
+            agent_context = f"\n--- {config.emoji} {config.name} (Local DB) ---\n"
             for chunk in chunks:
                 source = Path(chunk["source"]).name if chunk["source"] != "unknown" else "unknown"
                 agent_context += f"[Source: {source}]\n{chunk['content']}\n\n"
             context_parts.append(agent_context)
 
-    full_context = "\n".join(context_parts)
+    # Corrective RAG: Always augment with live web search for maximum freshness
+    web_context = augment_with_web_search(query, all_sources)
+    
+    full_context = "\n".join(context_parts) + web_context
     agents_consulted = ", ".join(f"{AGENTS[a].emoji} {AGENTS[a].name}" for a in agents_used)
 
     if not full_context.strip():
-        return "I don't have enough information in my knowledge base to answer that question. Please try rephrasing or ask about Indian agriculture topics like crops, market prices, government schemes, or weather advisories."
+        # Even if context is empty, allow the LLM to answer using its own knowledge
+        full_context = "No specific local or web documents retrieved. Answer based on your own knowledge."
 
     # Use LLM if available
     if LLM_AVAILABLE and LLM is not None:
@@ -297,13 +308,16 @@ def synthesize_answer(query: str, agent_results: Dict[str, List[Dict]], agents_u
                 question=query,
                 language=language
             )
-            response = LLM.invoke(prompt)
-            return response.content
+            # Stream the response
+            async for chunk in LLM.astream(prompt):
+                if chunk.content:
+                    yield chunk.content
+            return
         except Exception as e:
             logger.error(f"LLM synthesis failed: {e}")
             # Fall through to fallback
 
-    # Fallback: return context directly with formatting
+    # Fallback if LLM fails
     fallback = f"**Agents consulted:** {agents_consulted}\n\n"
     fallback += "**Based on available information:**\n\n"
     for agent_id in agents_used:
@@ -313,27 +327,17 @@ def synthesize_answer(query: str, agent_results: Dict[str, List[Dict]], agents_u
             fallback += f"### {config.emoji} {config.name}\n"
             for chunk in chunks:
                 source = Path(chunk["source"]).name if chunk["source"] != "unknown" else "unknown"
-                # Trim to most relevant excerpt
                 content = chunk["content"][:500]
                 fallback += f"{content}\n*[Source: {source}]*\n\n"
-    return fallback
+    yield fallback
 
 
 # ---------------------------------------------------------------------------
-# Main Entry Point — get_answer()
+# Streaming Entry Point — stream_answer()
 # ---------------------------------------------------------------------------
-def get_answer(query: str, language: str = "English") -> Dict:
-    """Process a query through the Multi-RAG pipeline.
-
-    Steps:
-      1. Route query to relevant agents
-      2. Each agent retrieves from FAISS
-      3. Synthesize all results into a unified answer
-
-    Returns:
-      dict with keys: answer, sources, agents_used
-    """
-    logger.info(f"Processing query: {query[:100]}...")
+async def stream_answer(query: str, language: str = "English") -> AsyncGenerator[str, None]:
+    """Process a query through the Multi-RAG pipeline and stream the result as SSE."""
+    logger.info(f"Processing streaming query: {query[:100]}...")
 
     # Step 1: Route
     agents_used = route_query(query)
@@ -349,10 +353,14 @@ def get_answer(query: str, language: str = "English") -> Dict:
             source = Path(r["source"]).name if r["source"] != "unknown" else "unknown"
             all_sources.add(source)
 
-    # Step 3: Synthesize
-    answer = synthesize_answer(query, agent_results, agents_used, language)
+    # Step 3: Synthesize and Stream
+    async for text_chunk in synthesize_answer_stream(query, agent_results, agents_used, all_sources, language):
+        # Yield as Server-Sent Event with ensure_ascii=False to support native unicode characters
+        yield f"data: {json.dumps({'chunk': text_chunk}, ensure_ascii=False)}\n\n"
+        # Small sleep to allow event loop to breathe
+        await asyncio.sleep(0.01)
 
-    # Build agent info for response
+    # Step 4: Build and yield final metadata
     agents_info = []
     for agent_id in agents_used:
         config = AGENTS[agent_id]
@@ -364,11 +372,12 @@ def get_answer(query: str, language: str = "English") -> Dict:
             "chunks_retrieved": len(agent_results.get(agent_id, [])),
         })
 
-    return {
-        "answer": answer,
+    metadata = {
         "sources": list(all_sources),
         "agents_used": agents_info,
     }
+    yield f"data: {json.dumps({'metadata': metadata}, ensure_ascii=False)}\n\n"
+    yield "data: [DONE]\n\n"
 
 
 def get_all_agents() -> List[Dict]:
@@ -382,29 +391,3 @@ def get_all_agents() -> List[Dict]:
         }
         for config in AGENTS.values()
     ]
-
-
-# ---------------------------------------------------------------------------
-# CLI for testing
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    import sys
-
-    logging.basicConfig(level=logging.INFO)
-
-    if len(sys.argv) > 1:
-        q = " ".join(sys.argv[1:])
-        print(f"\n{'='*60}")
-        print(f"Query: {q}")
-        print(f"{'='*60}\n")
-
-        result = get_answer(q)
-
-        print(f"Agents Used: {', '.join(a['emoji'] + ' ' + a['name'] for a in result['agents_used'])}")
-        print(f"Sources: {', '.join(result['sources'])}")
-        print(f"\n{'='*60}")
-        print(f"Answer:\n{result['answer']}")
-        print(f"{'='*60}\n")
-    else:
-        print("Usage: python multi_rag.py <your question>")
-        print("Example: python multi_rag.py What is the MSP of paddy?")

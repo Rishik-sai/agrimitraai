@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
 
 const SUGGESTIONS = [
   "What is the MSP of paddy?",
@@ -33,22 +33,81 @@ function Chat({ activeAgent, t, language, locale }) {
     setLoading(true);
     setQuery('');
 
+    // Pre-create assistant message to append to
+    setMessages((prev) => [...prev, { role: 'assistant', content: '', sources: [], agents_used: [] }]);
+
     try {
-      // Pass the language parameter to the backend
-      const resp = await axios.post('/api/chat', { query: messageText, language: language });
-      const botMsg = {
-        role: 'assistant',
-        content: resp.data.answer,
-        sources: resp.data.sources || [],
-        agents_used: resp.data.agents_used || [],
-      };
-      setMessages((prev) => [...prev, botMsg]);
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: messageText, language: language })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let done = false;
+      let buffer = '';
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          // Keep the last partial line in the buffer
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
+            
+            if (trimmedLine.startsWith('data: ')) {
+              const dataStr = trimmedLine.replace('data: ', '').trim();
+              if (dataStr === '[DONE]') {
+                continue;
+              }
+              
+              try {
+                const data = JSON.parse(dataStr);
+                
+                setMessages((prev) => {
+                  const newMsgs = [...prev];
+                  // Create a shallow copy of the last message to avoid mutating state directly, 
+                  // which causes double-appending in React StrictMode
+                  const lastMsg = { ...newMsgs[newMsgs.length - 1] };
+                  
+                  if (data.chunk) {
+                    lastMsg.content += data.chunk;
+                  }
+                  
+                  if (data.metadata) {
+                    lastMsg.sources = data.metadata.sources || [];
+                    lastMsg.agents_used = data.metadata.agents_used || [];
+                  }
+                  
+                  newMsgs[newMsgs.length - 1] = lastMsg;
+                  return newMsgs;
+                });
+                
+              } catch (e) {
+                console.error("Failed to parse SSE JSON:", dataStr, e);
+              }
+            }
+          }
+        }
+      }
     } catch (e) {
-      const errMsg = {
-        role: 'assistant',
-        content: '⚠️ Unable to reach the AI backend. Make sure the FastAPI server is running on port 8000.\n\nStart it with: `uvicorn main:app --reload --port 8000`',
-      };
-      setMessages((prev) => [...prev, errMsg]);
+      console.error(e);
+      setMessages((prev) => {
+        const newMsgs = [...prev];
+        const lastMsg = newMsgs[newMsgs.length - 1];
+        lastMsg.content = '⚠️ Unable to reach the AI backend. Make sure the FastAPI server is running on port 8000.\n\nStart it with: `uvicorn main:app --reload --port 8000`';
+        return newMsgs;
+      });
     } finally {
       setLoading(false);
     }
@@ -91,20 +150,18 @@ function Chat({ activeAgent, t, language, locale }) {
 
   return (
     <div className="chat-container">
-      {/* Header */}
       <div className="chat-header">
         <h2 className="chat-title">💬 {t?.agentsAll || "Chat Assistant"}</h2>
-        <span className="chat-badge">Multi-RAG</span>
+        <span className="chat-badge">Multi-RAG (Live Data)</span>
       </div>
 
-      {/* Messages */}
       <div className="messages">
         {messages.length === 0 && (
           <div className="welcome-message">
             <div className="welcome-emoji">🌾</div>
             <h3 className="welcome-title">Welcome to AgriMitra AI</h3>
             <p className="welcome-text">
-              {t?.chatSelectAgent || "Ask me anything about crops, market prices, government schemes, weather, or plant diseases. I'll route your question to the right expert agents."}
+              {t?.chatSelectAgent || "Ask me anything about crops, market prices, government schemes, weather, or plant diseases. I'll route your question to the right expert agents and search the web for live data if needed."}
             </p>
             <div className="welcome-suggestions">
               {SUGGESTIONS.map((s, i) => (
@@ -122,7 +179,6 @@ function Chat({ activeAgent, t, language, locale }) {
 
         {messages.map((msg, i) => (
           <div key={i} className={`message ${msg.role}`}>
-            {/* Agent badges */}
             {msg.agents_used && msg.agents_used.length > 0 && (
               <div className="msg-agents">
                 {msg.agents_used.map((agent, j) => (
@@ -133,34 +189,34 @@ function Chat({ activeAgent, t, language, locale }) {
               </div>
             )}
 
-            {/* Content */}
-            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+            <div className="msg-content-md">
+              <ReactMarkdown>{msg.content}</ReactMarkdown>
+            </div>
 
-            {/* Sources */}
             {msg.sources && msg.sources.length > 0 && (
               <div className="msg-sources">
                 {msg.sources.map((src, j) => (
-                  <span key={j} className="msg-source-chip">📄 {src}</span>
+                  <span key={j} className="msg-source-chip">
+                    {src === 'web' || src.includes('.') ? '🌐' : '📄'} {src}
+                  </span>
                 ))}
               </div>
             )}
           </div>
         ))}
 
-        {/* Typing indicator */}
-        {loading && (
+        {loading && (!messages.length || messages[messages.length-1].role !== 'assistant' || !messages[messages.length-1].content) && (
           <div className="typing-indicator">
             <div className="typing-dots">
               <span></span><span></span><span></span>
             </div>
-            <span className="typing-text">{t?.chatConnecting || "Consulting agents..."}</span>
+            <span className="typing-text">{t?.chatConnecting || "Consulting agents & searching the web..."}</span>
           </div>
         )}
 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="chat-input-area" style={{ position: 'relative' }}>
         <textarea
           className="chat-input"

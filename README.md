@@ -5,28 +5,36 @@ AgriMitra AI Pro is a state-of-the-art agricultural advisory system designed to 
 
 ---
 
+## 📋 GitHub Repository Information
+
+### Short Description (for GitHub About section)
+> A multilingual Multi-RAG Agricultural Intelligence System for Indian farmers. Powered by FastAPI, React, and Groq LLMs. Features 5 specialized AI agents, real-time market trends, weather advisories, voice search, and multimodal leaf disease scanning.
+
+### Suggested GitHub Repository Topics/Tags
+`agriculture-ai` • `multi-rag` • `crag` • `fastapi` • `react` • `framer-motion` • `server-sent-events` • `langchain` • `groq-api` • `faiss` • `multilingual-ai` • `computer-vision` • `rag-agents`
+
+---
 ## ✨ Core Features
 
-1. **🌾 5 Specialized RAG Agents**:
-   - **Crop Advisor**: Expert advice on crop diseases, pest control, chemical/organic remedies, and cultivation practices.
-   - **Market Analyst**: Real-time MSP (Minimum Support Price) rates, mandi price ranges, demand forecasting, and storage advice.
-   - **Schemes Expert**: Detailed guidance on central and state government schemes (e.g., PM-KISAN, PMFBY, Rythu Bharosa) and eligibility criteria.
-   - **Weather Analyst**: Localized seasonal advisories, climate risk warnings, and crop suggestions.
-   - **Leaf Scanner**: Analyzes visual symptoms of crop leaves and suggests specific cures.
+1. **🧠 Corrective RAG (CRAG) & Live Web Search**:
+   - The system utilizes a dual-engine approach. It searches the local FAISS vector database for static ICAR guidelines and **simultaneously triggers a DuckDuckGo live web search** for up-to-date mandi prices, news, and weather.
+   
+2. **⚡ Real-Time Streaming Chat**:
+   - Built with **Server-Sent Events (SSE)**, the chat interface streams LLM responses in real-time natively, rendering markdown, bold text, and lists dynamically using `react-markdown`.
 
-2. **🌐 Full Multilingual Support (11 Languages)**:
-   - Supports English, Hindi (हिंदी), Telugu (తెలుగు), Marathi (मराठी), Bengali (বাংলা), Gujarati (ગુજરાતી), Kannada (ಕನ್ನಡ), Malayalam (മലയാളം), Odia (ଓଡ଼ିଆ), Punjabi (ਪੰਜਾਬੀ), and Tamil (தமிழ்).
-   - Dynamic real-time LLM-driven translation engine translates server-side agricultural data on the fly.
+3. **🌾 5 Specialized RAG Agents**:
+   - **Crop Advisor**, **Market Analyst**, **Schemes Expert**, **Weather Analyst**, and **Leaf Scanner**.
 
-3. **🎙️ Voice-Activated Search**:
-   - Includes a voice input option ("Speak" button) allowing farmers to speak their queries in their preferred language.
+4. **🌐 Full Multilingual Support (11 Languages)**:
+   - Supports English, Hindi, Telugu, Marathi, Bengali, Gujarati, Kannada, Malayalam, Odia, Punjabi, and Tamil.
+   - Dynamic real-time LLM-driven translation engine.
 
-4. **🔬 Multimodal Leaf Disease Scanner**:
-   - Upload leaf photos to analyze plant pathology instantly. Powered by Groq Vision models (e.g., `meta-llama/llama-4-scout-17b-16e-instruct`) to diagnose leaf diseases, calculate infection severity, and suggest chemical or organic remedies.
+5. **🔬 Multimodal Leaf Disease Scanner**:
+   - Upload leaf photos to analyze plant pathology instantly using Groq Vision (`llama-4-scout-17b-16e-instruct`).
 
-5. **🌦️ Weather & Market Price Dashboards**:
-   - Real-time district-level weather insights.
-   - Mandi pricing ranges, trends (up/down/stable), and market demands per quintal.
+6. **📱 Premium Multi-Page UI**:
+   - Fully refactored using `react-router-dom` for a multi-page dashboard experience.
+   - Features **glassmorphism**, a deep dark theme, and smooth fluid animations powered by **Framer Motion**.
 
 ---
 
@@ -39,32 +47,35 @@ graph TD
     
     subgraph Agent RAG Pipeline
       C --> D[Retrieve from FAISS Vector Store]
+      C --> W[DuckDuckGo Web Search]
       D --> E[Extract Context Chunks]
+      W --> E
     end
     
     E --> F[LLM Synthesizer Groq]
-    F --> G[Dynamic Language Translator]
-    G --> H[Final Actionable Answer]
+    F --> G[Real-Time SSE Stream]
+    G --> H[React UI w/ Markdown]
 ```
 
-- **FAISS Vector Store**: Uses a lightweight sentence-transformer embedding model (`all-MiniLM-L6-v2`) to encode ICAR guidelines, scheme datasets, and market details.
-- **Query Routing**: Automatically classifies queries to trigger only the most relevant agents (e.g., querying about paddy prices calls the `Market Analyst` and `Crop Advisor`).
+- **FAISS Vector Store**: Uses a lightweight sentence-transformer embedding model (`all-MiniLM-L6-v2`) to encode static ICAR guidelines.
+- **Corrective RAG**: Always augments queries with DuckDuckGo web search to ensure the LLM has today's context.
+- **Streaming Generation**: The backend yields async chunks over `text/event-stream` for instant frontend rendering.
 
 ---
 
 ## 🛠️ Technology Stack
 
 ### Backend
-* **FastAPI**: High-performance Python web framework for APIs.
-* **LangChain**: Orchestrates the multi-agent vector search and synthesis prompts.
-* **FAISS (CPU)**: Efficient local vector database for document storage and retrieval.
-* **Groq API**: High-speed inference using `llama-3.3-70b-versatile` and `meta-llama/llama-4-scout-17b-16e-instruct` (Vision).
-* **Sentence-Transformers**: Embeds agricultural knowledge documents.
+* **FastAPI**: High-performance Python web framework (serving SSE streams).
+* **LangChain**: Orchestrates the multi-agent vector search, DuckDuckGo search, and async streaming.
+* **FAISS (CPU)**: Efficient local vector database.
+* **Groq API**: High-speed inference using `llama-3.3-70b-versatile`.
+* **DuckDuckGo-Search**: Real-time web scraping for Corrective RAG.
 
 ### Frontend
-* **React + Vite**: Fast, hot-reloading user interface.
-* **Axios**: Communicates with the FastAPI server.
-* **Lucide React / Custom Icons**: Modern, responsive dashboard design.
+* **React + Vite + React Router**: Multi-page fast frontend dashboard.
+* **Framer Motion**: Fluid stagger animations and page transitions.
+* **React Markdown**: Renders real-time streamed markdown text natively.
 * **Vanilla CSS**: Premium dark-mode layout with glassmorphic cards and interactive grids.
 
 ---
