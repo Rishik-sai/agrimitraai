@@ -90,3 +90,13 @@ dmypy.json
 .pytype/
 cython_debug/
 
+# Node
+node_modules/
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
