@@ -114,3 +114,8 @@ coverage
 bower_components
 .lock-wscript
 
+build/Release
+jspm_packages/
+web_modules/
+*.tsbuildinfo
+
