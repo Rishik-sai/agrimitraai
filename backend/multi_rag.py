@@ -23,10 +23,12 @@ from typing import Dict, List, Optional, AsyncGenerator, TypedDict
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+import structlog
+import time
 
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # AgriState — Typed state flowing through the LangGraph
@@ -51,17 +53,19 @@ class AgriState(TypedDict):
 # Configuration
 # ---------------------------------------------------------------------------
 FAISS_INDEX_PATH = Path(__file__).parent / "faiss_index"
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
+CROSS_ENCODER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 LLM_AVAILABLE = False
 LLM = None
 EMBEDDINGS = None
 VECTORDB = None
+CROSS_ENCODER = None
 
 
 def _init_components():
     """Lazy initialization of LLM, embeddings, and vector store."""
-    global LLM_AVAILABLE, LLM, EMBEDDINGS, VECTORDB
+    global LLM_AVAILABLE, LLM, EMBEDDINGS, VECTORDB, CROSS_ENCODER
 
     if EMBEDDINGS is not None:
         return  # Already initialized
@@ -73,6 +77,14 @@ def _init_components():
     except Exception as e:
         logger.error(f"Failed to load embeddings: {e}")
         return
+
+    if CROSS_ENCODER is None:
+        try:
+            from sentence_transformers import CrossEncoder
+            CROSS_ENCODER = CrossEncoder(CROSS_ENCODER_MODEL_NAME)
+            logger.info(f"Loaded CrossEncoder model: {CROSS_ENCODER_MODEL_NAME}")
+        except Exception as e:
+            logger.error(f"Failed to load CrossEncoder: {e}")
 
     # Load FAISS index
     if FAISS_INDEX_PATH.exists():
@@ -232,8 +244,18 @@ def agent_retrieve(agent_id: str, query: str) -> List[Dict]:
         return results
 
     try:
-        docs = VECTORDB.similarity_search(query, k=config.retrieval_k)
-        for doc in docs:
+        docs = VECTORDB.similarity_search(query, k=20)
+        
+        if CROSS_ENCODER is not None and docs:
+            pairs = [[query, doc.page_content] for doc in docs]
+            scores = CROSS_ENCODER.predict(pairs)
+            doc_score_pairs = list(zip(docs, scores))
+            doc_score_pairs.sort(key=lambda x: x[1], reverse=True)
+            top_docs = [doc for doc, score in doc_score_pairs[:5]]
+        else:
+            top_docs = docs[:5]
+
+        for doc in top_docs:
             results.append({
                 "content": doc.page_content,
                 "source": doc.metadata.get("source", "unknown"),
@@ -336,7 +358,10 @@ SCORING RULES:
 Respond with ONLY a single decimal number between 0.0 and 1.0. Nothing else."""
 
     try:
+        start_time = time.time()
         response = LLM.invoke(grading_prompt)
+        latency_ms = int((time.time() - start_time) * 1000)
+        logger.info("LLM call completed", llm_node="evaluate_retrieval", latency_ms=latency_ms)
         score_text = response.content.strip()
         # Parse the score — handle edge cases
         score = float(score_text.split()[0])
@@ -404,7 +429,10 @@ def synthesize_node(state: AgriState) -> dict:
                 question=state["query"],
                 language=language,
             )
+            start_time = time.time()
             response = LLM.invoke(prompt)
+            latency_ms = int((time.time() - start_time) * 1000)
+            logger.info("LLM call completed", llm_node="synthesize", latency_ms=latency_ms)
             answer = response.content
             logger.info(f"[synthesize_node] Generated answer ({len(answer)} chars)")
             return {"answer": answer}
@@ -459,7 +487,10 @@ Criteria:
 
 JSON only, no markdown:"""
 
+        start_time = time.time()
         response = LLM.invoke(reflect_prompt)
+        latency_ms = int((time.time() - start_time) * 1000)
+        logger.info("LLM call completed", llm_node="reflect", latency_ms=latency_ms)
         content = response.content.strip()
         if content.startswith("```"):
             content = content.split("\n", 1)[1] if "\n" in content else content[3:]

@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: agrimitra-backend
+    env: python
+    buildCommand: "cd backend && pip install -r requirements.txt && python ingest.py"
+    startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: DATAGOV_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

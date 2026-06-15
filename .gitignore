@@ -128,3 +128,9 @@ web_modules/
 checkpoints.db
 checkpoints.db-journal
 
+# Build outputs
+frontend/dist/
+
+# Generated scripts
+generate_docs.py
+make_commits.ps1

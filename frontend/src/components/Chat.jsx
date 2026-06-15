@@ -23,6 +23,8 @@ function Chat({ activeAgent, t, language, locale }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -129,32 +131,67 @@ function Chat({ activeAgent, t, language, locale }) {
     }
   };
 
-  const startListening = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('Your browser does not support Speech Recognition.');
+  const handleVoiceToggle = async () => {
+    if (isListening) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+        setIsListening(false);
+      }
       return;
     }
-    const recognition = new SpeechRecognition();
-    recognition.lang = locale || 'en-IN';
-    recognition.interimResults = false;
-    
-    recognition.onstart = () => setIsListening(true);
-    
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setQuery(prev => (prev ? prev + ' ' : '') + transcript);
-      setIsListening(false);
-    };
-    
-    recognition.onerror = (event) => {
-      console.error(event.error);
-      setIsListening(false);
-    };
-    
-    recognition.onend = () => setIsListening(false);
-    
-    recognition.start();
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        
+        if (audioChunksRef.current.length === 0) return;
+        
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append("file", audioBlob, "voice_note.webm");
+
+        try {
+          setQuery(prev => prev + (prev ? ' ' : '') + "⏳ Transcribing...");
+          
+          const response = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          if (data.text) {
+            setQuery(prev => prev.replace("⏳ Transcribing...", "").trim() + (prev.replace("⏳ Transcribing...", "").trim() ? ' ' : '') + data.text);
+          } else {
+            setQuery(prev => prev.replace("⏳ Transcribing...", "").trim());
+          }
+        } catch (error) {
+          console.error("Transcription error:", error);
+          setQuery(prev => prev.replace("⏳ Transcribing...", "").trim());
+          alert("Failed to transcribe audio.");
+        }
+      };
+
+      mediaRecorder.start();
+      setIsListening(true);
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      alert("Microphone access denied or not available.");
+    }
   };
 
   return (
@@ -240,7 +277,7 @@ function Chat({ activeAgent, t, language, locale }) {
         <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: '8px' }}>
           <button
             className="send-btn"
-            onClick={startListening}
+            onClick={handleVoiceToggle}
             disabled={loading}
             title={t?.speakBtn || "Speak"}
             style={{ background: isListening ? '#ef4444' : 'var(--glass-border)' }}

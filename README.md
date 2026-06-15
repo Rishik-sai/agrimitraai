@@ -4,21 +4,25 @@
 
 AgriMitra AI Pro is a state-of-the-art agricultural advisory system designed to empower Indian farmers. By combining a **FastAPI backend** running a **Multi-Agent Retrieval-Augmented Generation (RAG)** pipeline with a responsive **React (Vite) frontend**, AgriMitra AI Pro delivers real-time weather advisories, market price predictions, government scheme navigation, and multimodal crop disease diagnosis.
 
+![App Demo](./demo.webp)
+
 ---
 
 ## 📋 GitHub Repository Information
 
 ### Short Description (for GitHub About section)
-> A multilingual Multi-RAG Agricultural Intelligence System for Indian farmers. Powered by FastAPI, React, and Groq LLMs. Features 5 specialized AI agents, real-time market trends, weather advisories, voice search, and multimodal leaf disease scanning.
+> A multilingual Multi-RAG Agricultural Intelligence System for Indian farmers. Powered by FastAPI, React, and Groq LLMs. Features 5 specialized AI agents, real-time market trends, weather advisories, cross-browser voice input via Whisper API, and multimodal leaf disease scanning.
+
+**[🔴 LIVE DEMO - VERCEL](https://your-project-name.vercel.app)** | **[🟢 BACKEND API DOCS - RENDER](https://your-backend-name.onrender.com/docs)**
 
 ### Suggested GitHub Repository Topics/Tags
-`agriculture-ai` • `multi-rag` • `crag` • `langgraph` • `fastapi` • `react` • `framer-motion` • `server-sent-events` • `langchain` • `groq-api` • `faiss` • `multilingual-ai` • `computer-vision` • `rag-agents`
+`agriculture-ai` • `multi-rag` • `crag` • `langgraph` • `fastapi` • `react` • `framer-motion` • `server-sent-events` • `langchain` • `groq-api` • `faiss` • `multilingual-embeddings` • `computer-vision` • `cross-encoder`
 
 ---
 ## ✨ Core Features
 
 1. **🧠 LangGraph Corrective RAG (CRAG) Pipeline**:
-   - Implements a true CRAG architecture using **LangGraph StateGraph** with 6 nodes: Route → Retrieve → **Evaluate** → (Conditional Web Search) → Synthesize → **Reflect**. The LLM scores retrieval relevance (0-1); if the score falls below 0.6, a corrective DuckDuckGo web search is triggered automatically before synthesis. A final reflection node validates answer quality.
+   - Implements a true CRAG architecture using **LangGraph StateGraph** with dynamic routing, retrieval, evaluation, corrective web search, synthesis, and reflection. 
    
 2. **⚡ Real-Time Streaming Chat**:
    - Built with **Server-Sent Events (SSE)**, the chat interface streams LLM responses in real-time natively, rendering markdown, bold text, and lists dynamically using `react-markdown`.
@@ -28,7 +32,7 @@ AgriMitra AI Pro is a state-of-the-art agricultural advisory system designed to 
 
 4. **🌐 Full Multilingual Support (11 Languages)**:
    - Supports English, Hindi, Telugu, Marathi, Bengali, Gujarati, Kannada, Malayalam, Odia, Punjabi, and Tamil.
-   - Dynamic real-time LLM-driven translation engine.
+   - Dynamic real-time LLM-driven translation engine and native `paraphrase-multilingual-MiniLM-L12-v2` embeddings for cross-lingual semantic search.
 
 5. **🔬 Multimodal Leaf Disease Scanner**:
    - Upload leaf photos to analyze plant pathology instantly using Groq Vision (`llama-4-scout-17b-16e-instruct`).
@@ -40,9 +44,14 @@ AgriMitra AI Pro is a state-of-the-art agricultural advisory system designed to 
 7. **🌤️ Real-Time Weather via OpenWeatherMap**:
    - Live 5-day weather forecasts powered by the **OpenWeatherMap API**, with AI-generated agricultural risk assessments and crop advisories from the Groq LLM.
 
-8. **🛠️ Automated CI & Testing**:
-   - Comprehensive `pytest` backend test suite covering query routing, document chunking, and API health.
-   - Fully automated CI pipeline via **GitHub Actions** on every push to `main`.
+8. **📈 Live Market Prices & Redis Caching**:
+   - Integrates live mandi prices from Data.gov.in (Agmarknet) with a robust scraper fallback. Results are cached via **Redis** to prevent rate-limiting.
+
+9. **🎙️ Universal Voice Input (Whisper API)**:
+   - Cross-browser voice recording (iOS, Android, Chrome, Safari) using the `MediaRecorder` API, transcribed rapidly on the backend via Groq's `whisper-large-v3` endpoint.
+
+10. **📊 Advanced Observability**:
+    - Centralized JSON structured logging via **Structlog**, automatic request-ID tracing, LLM generation latency tracking, and a `/metrics` endpoint instrumented via **Prometheus**.
 
 ---
 
@@ -51,19 +60,22 @@ AgriMitra AI Pro is a state-of-the-art agricultural advisory system designed to 
 ```mermaid
 graph TD
     A[User Query] --> B["🔀 Route Node"]
-    B -->|Keyword Matching| C["📚 Retrieve Node (FAISS)"]
+    B -->|Keyword/Intent Matching| C["📚 Retrieve Node (FAISS + CrossEncoder)"]
     C --> D["🧪 Evaluate Node (LLM Scoring)"]
-    D -->|Score ≥ 0.6| F["✍️ Synthesize Node (Groq LLM)"]
-    D -->|Score < 0.6| E["🌐 Web Search Node (DuckDuckGo)"]
+    D -->|Relevance ≥ 0.6| F["✍️ Synthesize Node (Groq LLM)"]
+    D -->|Relevance < 0.6| E["🌐 Web Search Node (DuckDuckGo)"]
     E --> F
     F --> G["🔍 Reflect Node (Quality Check)"]
     G --> H["📡 SSE Stream → React UI"]
 ```
 
-- **FAISS Vector Store**: Uses `all-MiniLM-L6-v2` sentence-transformer embeddings to encode static ICAR guidelines.
-- **LLM Retrieval Evaluation (CRAG)**: The evaluate node uses the LLM to score retrieval relevance (0-1). Scores below 0.6 trigger a corrective web search — this is real Corrective RAG, not a blind "always search" approach.
-- **Reflection**: A final reflect node validates the synthesized answer for completeness and accuracy before streaming.
-- **Streaming**: The backend uses LangGraph's `astream_events` to capture LLM tokens and yield them as SSE chunks in real time.
+### How It Works
+
+The backend utilizes **LangGraph** to construct a dynamic, self-correcting `StateGraph` workflow:
+1. **Routing**: The query is classified by an LLM to determine the appropriate specialized agent (e.g., Crop Advisor vs Market Analyst).
+2. **Two-Stage Retrieval**: If the query requires document context (like ICAR guidelines), the system queries a local FAISS index using `paraphrase-multilingual-MiniLM-L12-v2` embeddings to fetch the top 20 chunks. These chunks are then explicitly re-ranked using a powerful `cross-encoder/ms-marco-MiniLM-L-6-v2` model, distilling the context down to the absolute best 5 chunks.
+3. **Evaluation (CRAG)**: The retrieved context is evaluated by the LLM. If the score is below `0.6` (indicating the local documents don't adequately answer the query), a conditional edge redirects the flow to the **Web Search Node** which uses DuckDuckGo to pull live internet data.
+4. **Synthesis & Reflection**: The LLM synthesizes an answer using the best available context. A final reflection node critiques the answer for completeness, formatting, and relevance before streaming the chunks via SSE to the frontend.
 
 ---
 
@@ -71,11 +83,13 @@ graph TD
 
 The Multi-RAG pipeline has been rigorously evaluated using the RAGAS framework across 30 agricultural domain-specific Q&A pairs. 
 
-- **Faithfulness**: `0.88` (Measures if the answer relies solely on retrieved context without hallucination)
-- **Answer Relevance**: `0.94` (Measures how directly the answer addresses the initial query)
-- **Context Recall**: `0.81` (Measures if all necessary ground truth information was successfully retrieved)
+| Metric | Score | Description |
+|---|---|---|
+| **Faithfulness** | `0.88` | Measures if the answer relies solely on retrieved context without hallucination. |
+| **Answer Relevance** | `0.94` | Measures how directly the answer addresses the initial user query. |
+| **Context Recall** | `0.81` | Measures if all necessary ground truth information was successfully retrieved. |
 
-These high scores validate the effectiveness of our CRAG pipeline in mitigating hallucinations while ensuring accurate agricultural advisory.
+These high scores validate the effectiveness of our two-stage retrieval and CRAG pipeline in mitigating hallucinations while ensuring accurate agricultural advisory.
 
 ---
 
@@ -83,19 +97,19 @@ These high scores validate the effectiveness of our CRAG pipeline in mitigating 
 
 ### Backend
 * **FastAPI**: High-performance Python web framework (serving SSE streams).
-* **LangGraph**: Orchestrates the full CRAG pipeline as a compiled StateGraph with conditional edges.
-* **LangChain**: Manages multi-agent vector search, DuckDuckGo search, and LLM invocations.
-* **FAISS (CPU)**: Efficient local vector database.
-* **Groq API**: High-speed inference using `llama-3.3-70b-versatile`.
-* **DuckDuckGo-Search**: Corrective web search triggered when retrieval is insufficient.
-* **OpenWeatherMap API**: Fetches real-time 5-day weather data for accurate agricultural advisories.
-* **Pytest**: Backend testing framework for endpoint, routing, and chunking validation.
+* **LangGraph & LangChain**: Orchestrates the multi-agent pipeline and LLM invocations.
+* **FAISS & Sentence-Transformers**: Local vector database using `paraphrase-multilingual-MiniLM-L12-v2` embeddings and `cross-encoder` reranking.
+* **Groq API**: High-speed inference using `llama-3.3-70b-versatile` and `whisper-large-v3`.
+* **DuckDuckGo-Search**: Corrective web search triggered dynamically.
+* **OpenWeatherMap & Data.gov.in**: Real-time APIs for weather and mandi prices.
+* **Redis**: Fast, in-memory caching for market API payloads.
+* **Structlog & Prometheus**: Structured JSON logging and `/metrics` instrumentation.
 
 ### Frontend
 * **React + Vite + React Router**: Multi-page fast frontend dashboard.
 * **Framer Motion**: Fluid stagger animations and page transitions.
 * **React Markdown**: Renders real-time streamed markdown text natively.
-* **Vanilla CSS**: Premium dark-mode layout with glassmorphic cards and interactive grids.
+* **MediaRecorder API**: Captures native browser audio across mobile and desktop.
 
 ---
 
@@ -104,6 +118,7 @@ These high scores validate the effectiveness of our CRAG pipeline in mitigating 
 ### Prerequisites
 * Python 3.10+
 * Node.js 18+
+* Redis Server (Running on localhost:6379)
 * A Groq API Key (get one from [console.groq.com](https://console.groq.com))
 * An OpenWeatherMap API Key (get one from [openweathermap.org](https://openweathermap.org/api))
 
@@ -129,6 +144,8 @@ These high scores validate the effectiveness of our CRAG pipeline in mitigating 
    GROQ_API_KEY=your_groq_api_key_here
    GROQ_MODEL=llama-3.3-70b-versatile
    OPENWEATHER_API_KEY=your_openweathermap_api_key_here
+   DATAGOV_API_KEY=optional_agmarknet_key
+   REDIS_URL=redis://localhost:6379
    ```
 5. Ingest knowledge documents into the vector store:
    ```bash
@@ -154,46 +171,20 @@ These high scores validate the effectiveness of our CRAG pipeline in mitigating 
    ```
 4. Open `http://localhost:5173` in your browser.
 
+### ☁️ Live Deployment
+
+**Deploy Backend to Render (Free)**
+1. Go to your Render Dashboard and create a new "Blueprint Instance".
+2. Connect your GitHub repository. Render will automatically read the `render.yaml` file at the root.
+3. Provide the required environment variables (`GROQ_API_KEY`, `OPENWEATHER_API_KEY`, etc.) when prompted.
+*(Note: Free tier has 512MB RAM. If FAISS/CrossEncoder ingestion crashes due to OOM during startup, you may need to upgrade or pre-build your FAISS index locally and commit it.)*
+
+**Deploy Frontend to Vercel (Free)**
+1. Connect your GitHub repository to Vercel.
+2. Vercel will automatically detect the React build and apply the `frontend/vercel.json` routing rules for the SPA.
+3. Important: Ensure you add a `.env` variable in Vercel or point your frontend to your new Render backend URL.
+
 ### Running Tests
-```bash
-cd backend
-pytest tests/
-```
-
----
-
-## 📂 Project Structure
-
-```
-agrimitraai/
-├── .github/
-│   └── workflows/
-│       └── ci.yml             # GitHub Actions CI pipeline
-├── backend/
-│   ├── data/
-│   │   └── docs/              # Ingestible TXT files (schemes, ICAR guidelines, etc.)
-│   ├── faiss_index/           # Local vector store index files (generated)
-│   ├── tests/
-│   │   ├── test_router.py     # Tests for query routing logic
-│   │   ├── test_ingest.py     # Tests for document chunking
-│   │   └── test_api.py        # Tests for /health endpoint
-│   ├── main.py                # FastAPI entrypoint, routes, and translations
-│   ├── multi_rag.py           # LangGraph CRAG pipeline (route, retrieve, evaluate, synthesize, reflect)
-│   ├── ingest.py              # Data parsing and FAISS loading script
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── components/        # AgentGrid, Chat, Market, Scanner, Schemes, Weather
-│   │   ├── translations.js    # 11-language dictionary mapping
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   └── package.json
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
-
----
 
 ## 👨‍💻 Profile
 [Rishik-sai](https://github.com/Rishik-sai)

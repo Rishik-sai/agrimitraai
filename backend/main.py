@@ -24,24 +24,50 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import structlog
+import uuid
+import time
+from starlette.middleware.base import BaseHTTPMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Load environment variables
 load_dotenv()
 
+REDIS_CLIENT = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global REDIS_CLIENT
+    try:
+        import redis.asyncio as redis_async
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        REDIS_CLIENT = redis_async.from_url(redis_url, decode_responses=True)
+        await REDIS_CLIENT.ping()
+        logger.info("Connected to Redis successfully.")
+    except Exception as e:
+        logger.warning(f"Could not connect to Redis: {e}. Caching disabled.")
+        REDIS_CLIENT = None
+
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key or api_key == "your_key_here":
         logger.error("GROQ_API_KEY environment variable is not set. Failing fast.")
         raise RuntimeError("GROQ_API_KEY environment variable is missing.")
     yield
+    if REDIS_CLIENT:
+        await REDIS_CLIENT.aclose()
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer()
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+    logger_factory=structlog.PrintLoggerFactory(),
 )
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Import the Multi-RAG engine
 from multi_rag import get_all_agents, stream_answer
@@ -52,6 +78,18 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(request_id=request_id)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+app.add_middleware(RequestIdMiddleware)
+Instrumentator().instrument(app).expose(app)
 
 # CORS for local development
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
@@ -137,7 +175,11 @@ INPUT JSON:
 
 OUTPUT (valid JSON only, translated to {lang_full}):"""
 
+        start_time = time.time()
         response = llm.invoke(prompt)
+        latency_ms = int((time.time() - start_time) * 1000)
+        logger.info("LLM call completed", llm_node="translation", latency_ms=latency_ms)
+        
         content = response.content.strip()
         # Strip markdown code fences if present
         if content.startswith("```json"):
@@ -211,6 +253,49 @@ async def chat_endpoint(request: Request, chat_request: ChatRequest):
 
 
 # ---------------------------------------------------------------------------
+# Audio Transcription (Whisper API)
+# ---------------------------------------------------------------------------
+@app.post("/api/transcribe")
+@limiter.limit("10/minute")
+async def transcribe_audio(request: Request, file: UploadFile = File(...)):
+    """Transcribe audio using Groq's Whisper API."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured")
+        
+    try:
+        contents = await file.read()
+        import httpx
+        
+        url = "https://api.groq.com/openai/v1/audio/transcriptions"
+        headers = {
+            "Authorization": f"Bearer {api_key}"
+        }
+        
+        files = {
+            "file": (file.filename or "audio.webm", contents, file.content_type or "audio/webm")
+        }
+        data = {
+            "model": "whisper-large-v3",
+            "response_format": "json"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, headers=headers, files=files, data=data, timeout=30.0)
+            
+        if resp.status_code != 200:
+            logger.error(f"Groq Whisper API error: {resp.text}")
+            raise HTTPException(status_code=500, detail="Failed to transcribe audio.")
+            
+        result = resp.json()
+        return {"text": result.get("text", "")}
+        
+    except Exception as e:
+        logger.error(f"Audio transcription error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
 # Agents Endpoint
 # ---------------------------------------------------------------------------
 @app.get("/api/agents")
@@ -257,8 +342,51 @@ async def geo_data():
 # ---------------------------------------------------------------------------
 # Market Data
 # ---------------------------------------------------------------------------
-def _get_market_data():
-    """Return raw market data in English."""
+async def _get_market_data():
+    """Fetch live mandi prices from data.gov.in Agmarknet API or via scraping."""
+    import httpx
+    api_key = os.getenv("DATAGOV_API_KEY")
+    
+    if api_key:
+        try:
+            url = f"https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key={api_key}&format=json&limit=50"
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, timeout=5.0)
+            if response.status_code == 200:
+                # Map real API data to our format
+                data = response.json()
+                records = data.get("records", [])
+                if records:
+                    results = {}
+                    for rec in records[:10]:
+                        crop = rec.get("commodity", "Unknown").title()
+                        min_price = rec.get("min_price", 0)
+                        max_price = rec.get("max_price", 0)
+                        results[crop] = {
+                            "currentRange": f"₹{min_price} – ₹{max_price}",
+                            "msp": None,
+                            "unit": "per Quintal",
+                            "demand": "Unknown",
+                            "trend": "stable",
+                            "change": "0%",
+                        }
+                    return results
+        except Exception as e:
+            logger.error(f"Failed to fetch real market data API: {e}")
+
+    # Scraper fallback attempt
+    try:
+        url = "https://agmarknet.gov.in/SearchCmmMkt.aspx"
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, timeout=5.0)
+            if resp.status_code == 200:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                logger.info("Agmarknet simple scraper fetched page successfully, but needs POST data for actual tables. Using fallback.")
+    except Exception as e:
+        logger.warning(f"Agmarknet scraper attempt failed: {e}")
+
+    logger.info("Returning fallback mock market data.")
     return {
         "Paddy": {
             "currentRange": "₹2,100 – ₹2,450",
@@ -321,9 +449,30 @@ def _get_market_data():
 
 @app.get("/api/market")
 async def market_data(lang: str = Query(default="en")):
-    """Return current market pricing data for major crops."""
-    data = _get_market_data()
-    return get_translated("market", data, lang, "crop market prices for farmers")
+    """Return current market pricing data for major crops with Redis caching."""
+    cache_key = "market_data_raw"
+    raw_data = None
+    
+    if REDIS_CLIENT:
+        try:
+            cached_json = await REDIS_CLIENT.get(cache_key)
+            if cached_json:
+                raw_data = json.loads(cached_json)
+                logger.info("Market data loaded from Redis cache")
+        except Exception as e:
+            logger.warning(f"Redis get error: {e}")
+
+    if not raw_data:
+        logger.info("Fetching fresh market data...")
+        raw_data = await _get_market_data()
+        
+        if REDIS_CLIENT:
+            try:
+                await REDIS_CLIENT.set(cache_key, json.dumps(raw_data), ex=3600)  # 1 hour cache
+            except Exception as e:
+                logger.warning(f"Redis set error: {e}")
+
+    return get_translated("market", raw_data, lang, "crop market prices for farmers")
 
 
 # ---------------------------------------------------------------------------
@@ -501,7 +650,11 @@ Required JSON structure:
   "advisory": "string (brief advisory for farmers based on the provided weather)",
   "suggested_crops": ["Crop Name 1", "Crop Name 2", "Crop Name 3"]
 }}"""
+        start_time = time.time()
         response = llm.invoke(prompt)
+        latency_ms = int((time.time() - start_time) * 1000)
+        logger.info("LLM call completed", llm_node="weather_advisory", latency_ms=latency_ms)
+        
         content = response.content.strip()
         if content.startswith("```json"):
             content = content[7:-3].strip()
@@ -604,7 +757,11 @@ Output ONLY valid JSON, with no markdown code blocks or extra text."""
         )
         
         logger.info(f"Sending leaf scan request ({file.filename}) to Groq Vision model...")
+        start_time = time.time()
         response = llm.invoke([message])
+        latency_ms = int((time.time() - start_time) * 1000)
+        logger.info("LLM call completed", llm_node="leaf_scan", latency_ms=latency_ms)
+        
         content = response.content.strip()
         
         # Clean up JSON formatting if LLM wrapped it in markdown

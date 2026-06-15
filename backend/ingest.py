@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import DirectoryLoader, TextLoader
+from langchain_community.document_loaders import DirectoryLoader, TextLoader, PDFMinerLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
@@ -22,25 +22,41 @@ DOCS_DIR = Path(__file__).parent / "data" / "docs"
 # Persisted FAISS index location
 FAISS_INDEX_PATH = Path(__file__).parent / "faiss_index"
 
-# Embedding model — lightweight and fast
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+# Embedding model — multilingual for broad language support
+EMBEDDING_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 
 def load_documents() -> List:
-    """Load text documents from DOCS_DIR."""
+    """Load text and PDF documents from DOCS_DIR."""
     if not DOCS_DIR.exists():
         logger.error(f"Documents directory not found: {DOCS_DIR}")
         raise FileNotFoundError(f"Documents directory not found: {DOCS_DIR}")
 
-    loader = DirectoryLoader(
+    txt_loader = DirectoryLoader(
         str(DOCS_DIR),
         glob="*.txt",
         loader_cls=TextLoader,
         loader_kwargs={"encoding": "utf-8"},
         show_progress=True,
     )
-    docs = loader.load()
-    logger.info(f"Loaded {len(docs)} documents from {DOCS_DIR}")
+    txt_docs = txt_loader.load()
+    logger.info(f"Loaded {len(txt_docs)} text documents from {DOCS_DIR}")
+
+    pdf_loader = DirectoryLoader(
+        str(DOCS_DIR),
+        glob="*.pdf",
+        loader_cls=PDFMinerLoader,
+        show_progress=True,
+    )
+    try:
+        pdf_docs = pdf_loader.load()
+        logger.info(f"Loaded {len(pdf_docs)} PDF documents from {DOCS_DIR}")
+    except Exception as e:
+        logger.error(f"Error loading PDFs: {e}")
+        pdf_docs = []
+
+    docs = txt_docs + pdf_docs
+    logger.info(f"Total documents loaded: {len(docs)}")
     return docs
 
 
