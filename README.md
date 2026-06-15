@@ -12,13 +12,13 @@ AgriMitra AI Pro is a state-of-the-art agricultural advisory system designed to 
 > A multilingual Multi-RAG Agricultural Intelligence System for Indian farmers. Powered by FastAPI, React, and Groq LLMs. Features 5 specialized AI agents, real-time market trends, weather advisories, voice search, and multimodal leaf disease scanning.
 
 ### Suggested GitHub Repository Topics/Tags
-`agriculture-ai` • `multi-rag` • `crag` • `fastapi` • `react` • `framer-motion` • `server-sent-events` • `langchain` • `groq-api` • `faiss` • `multilingual-ai` • `computer-vision` • `rag-agents`
+`agriculture-ai` • `multi-rag` • `crag` • `langgraph` • `fastapi` • `react` • `framer-motion` • `server-sent-events` • `langchain` • `groq-api` • `faiss` • `multilingual-ai` • `computer-vision` • `rag-agents`
 
 ---
 ## ✨ Core Features
 
-1. **🧠 Corrective RAG (CRAG) & Live Web Search**:
-   - The system utilizes a dual-engine approach. It searches the local FAISS vector database for static ICAR guidelines and **simultaneously triggers a DuckDuckGo live web search** for up-to-date mandi prices, news, and weather.
+1. **🧠 LangGraph Corrective RAG (CRAG) Pipeline**:
+   - Implements a true CRAG architecture using **LangGraph StateGraph** with 6 nodes: Route → Retrieve → **Evaluate** → (Conditional Web Search) → Synthesize → **Reflect**. The LLM scores retrieval relevance (0-1); if the score falls below 0.6, a corrective DuckDuckGo web search is triggered automatically before synthesis. A final reflection node validates answer quality.
    
 2. **⚡ Real-Time Streaming Chat**:
    - Built with **Server-Sent Events (SSE)**, the chat interface streams LLM responses in real-time natively, rendering markdown, bold text, and lists dynamically using `react-markdown`.
@@ -46,28 +46,24 @@ AgriMitra AI Pro is a state-of-the-art agricultural advisory system designed to 
 
 ---
 
-## 🏗️ Architecture & Flow
+## 🏗️ Architecture & Flow — LangGraph CRAG
 
 ```mermaid
 graph TD
-    A[User Query] --> B[Query Router]
-    B -->|Keyword Matching| C[1-3 Active Agents Selected]
-    
-    subgraph Agent RAG Pipeline
-      C --> D[Retrieve from FAISS Vector Store]
-      C --> W[DuckDuckGo Web Search]
-      D --> E[Extract Context Chunks]
-      W --> E
-    end
-    
-    E --> F[LLM Synthesizer Groq]
-    F --> G[Real-Time SSE Stream]
-    G --> H[React UI w/ Markdown]
+    A[User Query] --> B["🔀 Route Node"]
+    B -->|Keyword Matching| C["📚 Retrieve Node (FAISS)"]
+    C --> D["🧪 Evaluate Node (LLM Scoring)"]
+    D -->|Score ≥ 0.6| F["✍️ Synthesize Node (Groq LLM)"]
+    D -->|Score < 0.6| E["🌐 Web Search Node (DuckDuckGo)"]
+    E --> F
+    F --> G["🔍 Reflect Node (Quality Check)"]
+    G --> H["📡 SSE Stream → React UI"]
 ```
 
-- **FAISS Vector Store**: Uses a lightweight sentence-transformer embedding model (`all-MiniLM-L6-v2`) to encode static ICAR guidelines.
-- **Corrective RAG**: Always augments queries with DuckDuckGo web search to ensure the LLM has today's context.
-- **Streaming Generation**: The backend yields async chunks over `text/event-stream` for instant frontend rendering.
+- **FAISS Vector Store**: Uses `all-MiniLM-L6-v2` sentence-transformer embeddings to encode static ICAR guidelines.
+- **LLM Retrieval Evaluation (CRAG)**: The evaluate node uses the LLM to score retrieval relevance (0-1). Scores below 0.6 trigger a corrective web search — this is real Corrective RAG, not a blind "always search" approach.
+- **Reflection**: A final reflect node validates the synthesized answer for completeness and accuracy before streaming.
+- **Streaming**: The backend uses LangGraph's `astream_events` to capture LLM tokens and yield them as SSE chunks in real time.
 
 ---
 
@@ -75,10 +71,11 @@ graph TD
 
 ### Backend
 * **FastAPI**: High-performance Python web framework (serving SSE streams).
-* **LangChain**: Orchestrates the multi-agent vector search, DuckDuckGo search, and async streaming.
+* **LangGraph**: Orchestrates the full CRAG pipeline as a compiled StateGraph with conditional edges.
+* **LangChain**: Manages multi-agent vector search, DuckDuckGo search, and LLM invocations.
 * **FAISS (CPU)**: Efficient local vector database.
 * **Groq API**: High-speed inference using `llama-3.3-70b-versatile`.
-* **DuckDuckGo-Search**: Real-time web scraping for Corrective RAG.
+* **DuckDuckGo-Search**: Corrective web search triggered when retrieval is insufficient.
 * **OpenWeatherMap API**: Fetches real-time 5-day weather data for accurate agricultural advisories.
 * **Pytest**: Backend testing framework for endpoint, routing, and chunking validation.
 
@@ -169,7 +166,7 @@ agrimitraai/
 │   │   ├── test_ingest.py     # Tests for document chunking
 │   │   └── test_api.py        # Tests for /health endpoint
 │   ├── main.py                # FastAPI entrypoint, routes, and translations
-│   ├── multi_rag.py           # Routing, retrieval, and synthesis engines
+│   ├── multi_rag.py           # LangGraph CRAG pipeline (route, retrieve, evaluate, synthesize, reflect)
 │   ├── ingest.py              # Data parsing and FAISS loading script
 │   └── requirements.txt
 ├── frontend/

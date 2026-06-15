@@ -1,12 +1,13 @@
 # multi_rag.py
-"""Multi-RAG Engine for AgriMitra AI.
+"""LangGraph CRAG Engine for AgriMitra AI.
 
-Implements a multi-agent RAG (Retrieval-Augmented Generation) architecture with
-5 specialized agents that route, retrieve, and synthesize answers from domain-specific
-knowledge bases.
-
-Now augmented with Corrective RAG (CRAG) using DuckDuckGo for live web search
-and streaming response support.
+Implements a Corrective RAG (CRAG) pipeline using LangGraph StateGraph:
+  1. Route   — keyword-match the query to 1-3 specialized agents
+  2. Retrieve — FAISS similarity search per agent
+  3. Evaluate — LLM scores retrieval relevance (0-1)
+  4. Conditional — if score < 0.6 → web search, else → synthesize
+  5. Synthesize — LLM generates the final answer
+  6. Reflect  — LLM checks answer quality before returning
 """
 
 import os
@@ -14,14 +15,33 @@ import json
 import logging
 import asyncio
 from pathlib import Path
-from typing import Dict, List, Optional, AsyncGenerator
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, AsyncGenerator, TypedDict
 
 from dotenv import load_dotenv
+from langgraph.graph import StateGraph, END
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# AgriState — Typed state flowing through the LangGraph
+# ---------------------------------------------------------------------------
+class AgriState(TypedDict):
+    query: str
+    retrieved_docs: List[Dict]
+    retrieval_score: float
+    needs_web_search: bool
+    answer: str
+    conversation_history: List[Dict]
+    # Operational fields used internally by nodes
+    agents_used: List[str]
+    sources: List[str]
+    web_context: str
+    language: str
+    answer_quality: str
+    quality_note: str
+
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -29,7 +49,6 @@ logger = logging.getLogger(__name__)
 FAISS_INDEX_PATH = Path(__file__).parent / "faiss_index"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
-# Try to load Google Gemini/Groq; fall back to a simple echo if unavailable
 LLM_AVAILABLE = False
 LLM = None
 EMBEDDINGS = None
@@ -87,6 +106,8 @@ def _init_components():
 # ---------------------------------------------------------------------------
 # Agent Definitions
 # ---------------------------------------------------------------------------
+from dataclasses import dataclass
+
 @dataclass
 class AgentConfig:
     """Configuration for a single RAG agent."""
@@ -176,7 +197,7 @@ AGENTS: Dict[str, AgentConfig] = {
 
 
 # ---------------------------------------------------------------------------
-# Router — Classify query into agent domains
+# Core Logic (used by nodes and kept as public API for tests)
 # ---------------------------------------------------------------------------
 def route_query(query: str) -> List[str]:
     """Route a query to the most relevant agents using keyword matching."""
@@ -197,9 +218,6 @@ def route_query(query: str) -> List[str]:
     return top_agents
 
 
-# ---------------------------------------------------------------------------
-# Agent Retrieval — Each agent retrieves from the shared FAISS index
-# ---------------------------------------------------------------------------
 def agent_retrieve(agent_id: str, query: str) -> List[Dict]:
     """Retrieve relevant document chunks for a specific agent."""
     _init_components()
@@ -223,32 +241,248 @@ def agent_retrieve(agent_id: str, query: str) -> List[Dict]:
     return results
 
 
-# ---------------------------------------------------------------------------
-# Corrective RAG (Web Search Augmentation)
-# ---------------------------------------------------------------------------
-def augment_with_web_search(query: str, all_sources: set) -> str:
-    """Use DuckDuckGo to fetch live web data for up-to-date prices, news, or missing context."""
+def _web_search(query: str) -> tuple[str, List[str]]:
+    """Use DuckDuckGo to fetch live web data. Returns (context_str, source_list)."""
     try:
         from duckduckgo_search import DDGS
-        logger.info(f"Augmenting context with DuckDuckGo search for: {query}")
+        logger.info(f"CRAG web search for: {query}")
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=4))
             if not results:
-                return ""
-            
-            web_context = "\n--- 🌐 Live Web Search (Corrective RAG) ---\n"
+                return "", []
+
+            web_sources = []
+            web_context = "\n--- 🌐 Live Web Search (CRAG Corrective Retrieval) ---\n"
             for r in results:
                 source_domain = r.get('href', 'web').split('/')[2] if 'href' in r else 'web'
-                all_sources.add(source_domain)
+                web_sources.append(source_domain)
                 web_context += f"[Source: {source_domain}]\n{r.get('body', '')}\n\n"
-            return web_context
+            return web_context, web_sources
     except Exception as e:
         logger.error(f"DuckDuckGo search failed: {e}")
-        return ""
+        return "", []
 
 
 # ---------------------------------------------------------------------------
-# Synthesizer — Merge multi-agent results and Stream Answer
+# LangGraph Nodes
+# ---------------------------------------------------------------------------
+def route_node(state: AgriState) -> dict:
+    """Node 1: Route the query to the best-matching agents."""
+    agents = route_query(state["query"])
+    logger.info(f"[route_node] Selected agents: {agents}")
+    return {"agents_used": agents}
+
+
+def retrieve_node(state: AgriState) -> dict:
+    """Node 2: Retrieve relevant documents from FAISS for each routed agent."""
+    all_docs = []
+    all_sources = []
+
+    for agent_id in state["agents_used"]:
+        results = agent_retrieve(agent_id, state["query"])
+        all_docs.extend(results)
+        for r in results:
+            source = Path(r["source"]).name if r["source"] != "unknown" else "unknown"
+            if source not in all_sources:
+                all_sources.append(source)
+
+    logger.info(f"[retrieve_node] Retrieved {len(all_docs)} chunks from {len(all_sources)} sources")
+    return {"retrieved_docs": all_docs, "sources": all_sources}
+
+
+def evaluate_retrieval_node(state: AgriState) -> dict:
+    """Node 3 (CRAG): LLM evaluates whether retrieved docs actually answer the query.
+
+    Returns a relevance score (0-1). If score < 0.6, the pipeline
+    triggers corrective web search before synthesis.
+    """
+    _init_components()
+    docs = state["retrieved_docs"]
+
+    # If no docs retrieved at all, definitely need web search
+    if not docs:
+        logger.info("[evaluate_retrieval_node] No docs retrieved → needs_web_search=True")
+        return {"retrieval_score": 0.0, "needs_web_search": True}
+
+    # If LLM unavailable, use a simple heuristic
+    if not LLM_AVAILABLE or LLM is None:
+        score = min(len(docs) / 5.0, 1.0)
+        logger.info(f"[evaluate_retrieval_node] Heuristic score: {score:.2f}")
+        return {"retrieval_score": score, "needs_web_search": score < 0.6}
+
+    # LLM-based relevance grading (the core of CRAG)
+    doc_snippets = "\n\n".join(
+        f"[Doc {i+1}]: {d['content'][:300]}" for i, d in enumerate(docs[:5])
+    )
+
+    grading_prompt = f"""You are a retrieval evaluator. Score how well the following retrieved documents answer the user's question.
+
+USER QUESTION: {state["query"]}
+
+RETRIEVED DOCUMENTS:
+{doc_snippets}
+
+SCORING RULES:
+- 1.0 = Documents directly and fully answer the question
+- 0.7-0.9 = Documents are highly relevant and partially answer
+- 0.4-0.6 = Documents are somewhat related but don't directly answer
+- 0.1-0.3 = Documents are barely relevant
+- 0.0 = Documents are completely irrelevant
+
+Respond with ONLY a single decimal number between 0.0 and 1.0. Nothing else."""
+
+    try:
+        response = LLM.invoke(grading_prompt)
+        score_text = response.content.strip()
+        # Parse the score — handle edge cases
+        score = float(score_text.split()[0])
+        score = max(0.0, min(1.0, score))
+    except Exception as e:
+        logger.warning(f"[evaluate_retrieval_node] LLM scoring failed: {e}, using heuristic")
+        score = min(len(docs) / 5.0, 1.0)
+
+    needs_search = score < 0.6
+    logger.info(f"[evaluate_retrieval_node] Relevance score: {score:.2f}, needs_web_search: {needs_search}")
+    return {"retrieval_score": score, "needs_web_search": needs_search}
+
+
+def web_search_node(state: AgriState) -> dict:
+    """Node 4 (Conditional): Corrective web search when retrieval is insufficient."""
+    web_context, web_sources = _web_search(state["query"])
+    updated_sources = list(state.get("sources", [])) + web_sources
+    logger.info(f"[web_search_node] Added {len(web_sources)} web sources")
+    return {"web_context": web_context, "sources": updated_sources}
+
+
+def synthesize_node(state: AgriState) -> dict:
+    """Node 5: LLM synthesizes retrieved context + web search into a final answer."""
+    _init_components()
+
+    # Build context from retrieved docs
+    context_parts = []
+    agents_used = state.get("agents_used", [])
+    docs = state.get("retrieved_docs", [])
+
+    # Group docs by agent
+    agent_docs: Dict[str, List[Dict]] = {}
+    for doc in docs:
+        aid = doc.get("agent", "unknown")
+        agent_docs.setdefault(aid, []).append(doc)
+
+    for agent_id in agents_used:
+        if agent_id in AGENTS and agent_id in agent_docs:
+            config = AGENTS[agent_id]
+            agent_context = f"\n--- {config.emoji} {config.name} (Local DB) ---\n"
+            for chunk in agent_docs[agent_id]:
+                source = Path(chunk["source"]).name if chunk["source"] != "unknown" else "unknown"
+                agent_context += f"[Source: {source}]\n{chunk['content']}\n\n"
+            context_parts.append(agent_context)
+
+    # Append web context if CRAG triggered it
+    web_context = state.get("web_context", "")
+    full_context = "\n".join(context_parts) + web_context
+
+    agents_consulted = ", ".join(
+        f"{AGENTS[a].emoji} {AGENTS[a].name}" for a in agents_used if a in AGENTS
+    )
+
+    if not full_context.strip():
+        full_context = "No specific local or web documents retrieved. Answer based on your own knowledge."
+
+    language = state.get("language", "English")
+
+    # Use LLM if available
+    if LLM_AVAILABLE and LLM is not None:
+        try:
+            prompt = SYNTHESIS_PROMPT.format(
+                agents_consulted=agents_consulted,
+                context=full_context,
+                question=state["query"],
+                language=language,
+            )
+            response = LLM.invoke(prompt)
+            answer = response.content
+            logger.info(f"[synthesize_node] Generated answer ({len(answer)} chars)")
+            return {"answer": answer}
+        except Exception as e:
+            logger.error(f"[synthesize_node] LLM synthesis failed: {e}")
+
+    # Fallback
+    fallback = f"**Agents consulted:** {agents_consulted}\n\n"
+    fallback += "**Based on available information:**\n\n"
+    for agent_id in agents_used:
+        if agent_id in AGENTS and agent_id in agent_docs:
+            config = AGENTS[agent_id]
+            fallback += f"### {config.emoji} {config.name}\n"
+            for chunk in agent_docs[agent_id]:
+                source = Path(chunk["source"]).name if chunk["source"] != "unknown" else "unknown"
+                content = chunk["content"][:500]
+                fallback += f"{content}\n*[Source: {source}]*\n\n"
+
+    return {"answer": fallback}
+
+
+def reflect_node(state: AgriState) -> dict:
+    """Node 6: LLM reviews the generated answer for quality before returning.
+
+    Checks for completeness, accuracy relative to context, and helpfulness.
+    If quality is poor, adds a note indicating limitations.
+    """
+    _init_components()
+    answer = state.get("answer", "")
+
+    if not answer or not LLM_AVAILABLE or LLM is None:
+        return {"answer_quality": "unverified", "quality_note": ""}
+
+    try:
+        reflect_prompt = f"""You are a quality reviewer for an agricultural AI assistant.
+
+USER QUESTION: {state["query"]}
+
+GENERATED ANSWER:
+{answer[:2000]}
+
+Evaluate this answer and respond with ONLY valid JSON:
+{{
+  "quality": "good" or "needs_improvement",
+  "note": "Brief explanation if needs_improvement, otherwise empty string"
+}}
+
+Criteria:
+- Does it address the question directly?
+- Is it factually plausible for Indian agriculture?
+- Is it actionable and practical for a farmer?
+
+JSON only, no markdown:"""
+
+        response = LLM.invoke(reflect_prompt)
+        content = response.content.strip()
+        if content.startswith("```"):
+            content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        content = content.strip()
+
+        result = json.loads(content)
+        quality = result.get("quality", "good")
+        note = result.get("note", "")
+
+        # If reflection found issues, append a disclaimer to the answer
+        if quality == "needs_improvement" and note:
+            updated_answer = answer + f"\n\n---\n⚠️ *Note: {note}*"
+            logger.info(f"[reflect_node] Quality: {quality} — {note}")
+            return {"answer": updated_answer, "answer_quality": quality, "quality_note": note}
+
+        logger.info(f"[reflect_node] Quality: {quality}")
+        return {"answer_quality": quality, "quality_note": ""}
+
+    except Exception as e:
+        logger.warning(f"[reflect_node] Reflection failed: {e}")
+        return {"answer_quality": "unverified", "quality_note": ""}
+
+
+# ---------------------------------------------------------------------------
+# Prompts
 # ---------------------------------------------------------------------------
 SYNTHESIS_PROMPT = """You are AgriMitra AI, an expert agricultural assistant serving Indian farmers.
 You have received information from specialized agents and live web search results.
@@ -273,113 +507,141 @@ INSTRUCTIONS:
 ANSWER:"""
 
 
-async def synthesize_answer_stream(query: str, agent_results: Dict[str, List[Dict]], agents_used: List[str], all_sources: set, language: str = "English") -> AsyncGenerator[str, None]:
-    """Synthesize retrieved chunks and web search into a streaming final answer."""
-    _init_components()
+# ---------------------------------------------------------------------------
+# Conditional Edge
+# ---------------------------------------------------------------------------
+def _should_web_search(state: AgriState) -> str:
+    """Conditional edge: route to web_search if retrieval score < 0.6."""
+    if state.get("needs_web_search", False):
+        logger.info("[conditional] Retrieval insufficient → web_search")
+        return "web_search"
+    logger.info("[conditional] Retrieval sufficient → synthesize")
+    return "synthesize"
 
-    # Build context from all agent results
-    context_parts = []
-    for agent_id in agents_used:
-        config = AGENTS[agent_id]
-        chunks = agent_results.get(agent_id, [])
-        if chunks:
-            agent_context = f"\n--- {config.emoji} {config.name} (Local DB) ---\n"
-            for chunk in chunks:
-                source = Path(chunk["source"]).name if chunk["source"] != "unknown" else "unknown"
-                agent_context += f"[Source: {source}]\n{chunk['content']}\n\n"
-            context_parts.append(agent_context)
 
-    # Corrective RAG: Always augment with live web search for maximum freshness
-    web_context = augment_with_web_search(query, all_sources)
-    
-    full_context = "\n".join(context_parts) + web_context
-    agents_consulted = ", ".join(f"{AGENTS[a].emoji} {AGENTS[a].name}" for a in agents_used)
+# ---------------------------------------------------------------------------
+# Build & Compile the LangGraph StateGraph
+# ---------------------------------------------------------------------------
+workflow = StateGraph(AgriState)
 
-    if not full_context.strip():
-        # Even if context is empty, allow the LLM to answer using its own knowledge
-        full_context = "No specific local or web documents retrieved. Answer based on your own knowledge."
+# Add nodes
+workflow.add_node("route", route_node)
+workflow.add_node("retrieve", retrieve_node)
+workflow.add_node("evaluate", evaluate_retrieval_node)
+workflow.add_node("web_search", web_search_node)
+workflow.add_node("synthesize", synthesize_node)
+workflow.add_node("reflect", reflect_node)
 
-    # Use LLM if available
-    if LLM_AVAILABLE and LLM is not None:
-        try:
-            prompt = SYNTHESIS_PROMPT.format(
-                agents_consulted=agents_consulted,
-                context=full_context,
-                question=query,
-                language=language
-            )
-            # Stream the response
-            async for chunk in LLM.astream(prompt):
-                if chunk.content:
-                    yield chunk.content
-            return
-        except Exception as e:
-            logger.error(f"LLM synthesis failed: {e}")
-            # Fall through to fallback
+# Wire edges
+workflow.set_entry_point("route")
+workflow.add_edge("route", "retrieve")
+workflow.add_edge("retrieve", "evaluate")
+workflow.add_conditional_edges("evaluate", _should_web_search, {
+    "web_search": "web_search",
+    "synthesize": "synthesize",
+})
+workflow.add_edge("web_search", "synthesize")
+workflow.add_edge("synthesize", "reflect")
+workflow.add_edge("reflect", END)
 
-    # Fallback if LLM fails
-    fallback = f"**Agents consulted:** {agents_consulted}\n\n"
-    fallback += "**Based on available information:**\n\n"
-    for agent_id in agents_used:
-        config = AGENTS[agent_id]
-        chunks = agent_results.get(agent_id, [])
-        if chunks:
-            fallback += f"### {config.emoji} {config.name}\n"
-            for chunk in chunks:
-                source = Path(chunk["source"]).name if chunk["source"] != "unknown" else "unknown"
-                content = chunk["content"][:500]
-                fallback += f"{content}\n*[Source: {source}]*\n\n"
-    yield fallback
+# Compile
+crag_graph = workflow.compile()
+logger.info("LangGraph CRAG pipeline compiled successfully")
 
 
 # ---------------------------------------------------------------------------
 # Streaming Entry Point — stream_answer()
 # ---------------------------------------------------------------------------
 async def stream_answer(query: str, language: str = "English") -> AsyncGenerator[str, None]:
-    """Process a query through the Multi-RAG pipeline and stream the result as SSE."""
-    logger.info(f"Processing streaming query: {query[:100]}...")
+    """Process a query through the LangGraph CRAG pipeline and stream the result as SSE.
 
-    # Step 1: Route
-    agents_used = route_query(query)
-    logger.info(f"Selected agents: {agents_used}")
+    Uses astream_events to capture LLM token-level streaming from the
+    synthesize node, providing real-time output to the frontend.
+    """
+    logger.info(f"Processing CRAG query: {query[:100]}...")
 
-    # Step 2: Retrieve (from each agent)
-    agent_results: Dict[str, List[Dict]] = {}
-    all_sources = set()
-    for agent_id in agents_used:
-        results = agent_retrieve(agent_id, query)
-        agent_results[agent_id] = results
-        for r in results:
-            source = Path(r["source"]).name if r["source"] != "unknown" else "unknown"
-            all_sources.add(source)
+    initial_state: AgriState = {
+        "query": query,
+        "retrieved_docs": [],
+        "retrieval_score": 0.0,
+        "needs_web_search": False,
+        "answer": "",
+        "conversation_history": [],
+        "agents_used": [],
+        "sources": [],
+        "web_context": "",
+        "language": language,
+        "answer_quality": "",
+        "quality_note": "",
+    }
 
-    # Step 3: Synthesize and Stream
-    async for text_chunk in synthesize_answer_stream(query, agent_results, agents_used, all_sources, language):
-        # Yield as Server-Sent Event with ensure_ascii=False to support native unicode characters
-        yield f"data: {json.dumps({'chunk': text_chunk}, ensure_ascii=False)}\n\n"
-        # Small sleep to allow event loop to breathe
-        await asyncio.sleep(0.01)
+    final_state = {}
+    streamed_synthesis = False
 
-    # Step 4: Build and yield final metadata
+    try:
+        async for event in crag_graph.astream_events(initial_state, version="v2"):
+            kind = event.get("event", "")
+
+            # Stream LLM tokens ONLY from the synthesize node
+            if kind == "on_chat_model_stream":
+                node_name = event.get("metadata", {}).get("langgraph_node", "")
+                if node_name == "synthesize":
+                    token = event["data"]["chunk"].content
+                    if token:
+                        streamed_synthesis = True
+                        yield f"data: {json.dumps({'chunk': token}, ensure_ascii=False)}\n\n"
+                        await asyncio.sleep(0.01)
+
+            # Capture final graph output
+            if kind == "on_chain_end":
+                output = event.get("data", {}).get("output", {})
+                if isinstance(output, dict) and "answer" in output:
+                    final_state = output
+
+    except Exception as e:
+        logger.error(f"CRAG graph execution failed: {e}", exc_info=True)
+        yield f"data: {json.dumps({'chunk': f'Error processing query: {str(e)}'}, ensure_ascii=False)}\n\n"
+        yield "data: [DONE]\n\n"
+        return
+
+    # If astream_events didn't stream tokens (e.g., fallback mode),
+    # chunk the completed answer manually
+    if not streamed_synthesis and final_state.get("answer"):
+        answer = final_state["answer"]
+        chunk_size = 20
+        for i in range(0, len(answer), chunk_size):
+            yield f"data: {json.dumps({'chunk': answer[i:i+chunk_size]}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0.01)
+
+    # Build and yield final metadata
+    agents_used = final_state.get("agents_used", [])
     agents_info = []
     for agent_id in agents_used:
-        config = AGENTS[agent_id]
-        agents_info.append({
-            "id": config.id,
-            "name": config.name,
-            "emoji": config.emoji,
-            "description": config.description,
-            "chunks_retrieved": len(agent_results.get(agent_id, [])),
-        })
+        if agent_id in AGENTS:
+            config = AGENTS[agent_id]
+            docs_for_agent = [d for d in final_state.get("retrieved_docs", []) if d.get("agent") == agent_id]
+            agents_info.append({
+                "id": config.id,
+                "name": config.name,
+                "emoji": config.emoji,
+                "description": config.description,
+                "chunks_retrieved": len(docs_for_agent),
+            })
 
     metadata = {
-        "sources": list(all_sources),
+        "sources": final_state.get("sources", []),
         "agents_used": agents_info,
+        "retrieval_score": final_state.get("retrieval_score", 0.0),
+        "web_search_used": final_state.get("needs_web_search", False),
+        "answer_quality": final_state.get("answer_quality", ""),
     }
     yield f"data: {json.dumps({'metadata': metadata}, ensure_ascii=False)}\n\n"
     yield "data: [DONE]\n\n"
 
 
+# ---------------------------------------------------------------------------
+# Public API (unchanged for main.py and tests)
+# ---------------------------------------------------------------------------
 def get_all_agents() -> List[Dict]:
     """Return metadata for all available agents."""
     return [
