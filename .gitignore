@@ -125,4 +125,6 @@ web_modules/
 .nyc_output
 .yarn-integrity
 .cache
+checkpoints.db
+checkpoints.db-journal
 

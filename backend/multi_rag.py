@@ -8,17 +8,21 @@ Implements a Corrective RAG (CRAG) pipeline using LangGraph StateGraph:
   4. Conditional — if score < 0.6 → web search, else → synthesize
   5. Synthesize — LLM generates the final answer
   6. Reflect  — LLM checks answer quality before returning
+
+Conversation memory is persisted per session via SqliteSaver checkpointer.
 """
 
 import os
 import json
 import logging
 import asyncio
+import sqlite3
 from pathlib import Path
 from typing import Dict, List, Optional, AsyncGenerator, TypedDict
 
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 load_dotenv()
 
@@ -544,21 +548,27 @@ workflow.add_edge("web_search", "synthesize")
 workflow.add_edge("synthesize", "reflect")
 workflow.add_edge("reflect", END)
 
-# Compile
-crag_graph = workflow.compile()
-logger.info("LangGraph CRAG pipeline compiled successfully")
+# Compile base graph (without checkpointer) globally
+crag_graph_base = workflow.compile()
+DB_PATH = Path(__file__).parent / "checkpoints.db"
+logger.info("LangGraph CRAG pipeline base compiled")
 
 
 # ---------------------------------------------------------------------------
 # Streaming Entry Point — stream_answer()
 # ---------------------------------------------------------------------------
-async def stream_answer(query: str, language: str = "English") -> AsyncGenerator[str, None]:
+async def stream_answer(query: str, language: str = "English", session_id: Optional[str] = None) -> AsyncGenerator[str, None]:
     """Process a query through the LangGraph CRAG pipeline and stream the result as SSE.
 
     Uses astream_events to capture LLM token-level streaming from the
     synthesize node, providing real-time output to the frontend.
+
+    Args:
+        query: The user's question.
+        language: Target language for the answer.
+        session_id: Optional UUID to enable conversation memory via checkpointer.
     """
-    logger.info(f"Processing CRAG query: {query[:100]}...")
+    logger.info(f"Processing CRAG query: {query[:100]}... (session={session_id})")
 
     initial_state: AgriState = {
         "query": query,
@@ -575,28 +585,37 @@ async def stream_answer(query: str, language: str = "English") -> AsyncGenerator
         "quality_note": "",
     }
 
+    # Config with thread_id enables per-session state persistence
+    config = {}
+    if session_id:
+        config = {"configurable": {"thread_id": session_id}}
+
     final_state = {}
     streamed_synthesis = False
 
     try:
-        async for event in crag_graph.astream_events(initial_state, version="v2"):
-            kind = event.get("event", "")
+        async with AsyncSqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
+            # Recompile graph with the checkpointer for this session
+            crag_graph = workflow.compile(checkpointer=checkpointer)
+            
+            async for event in crag_graph.astream_events(initial_state, config=config, version="v2"):
+                kind = event.get("event", "")
+                
+                # Stream LLM tokens ONLY from the synthesize node
+                if kind == "on_chat_model_stream":
+                    node_name = event.get("metadata", {}).get("langgraph_node", "")
+                    if node_name == "synthesize":
+                        token = event["data"]["chunk"].content
+                        if token:
+                            streamed_synthesis = True
+                            yield f"data: {json.dumps({'chunk': token}, ensure_ascii=False)}\n\n"
+                            await asyncio.sleep(0.01)
 
-            # Stream LLM tokens ONLY from the synthesize node
-            if kind == "on_chat_model_stream":
-                node_name = event.get("metadata", {}).get("langgraph_node", "")
-                if node_name == "synthesize":
-                    token = event["data"]["chunk"].content
-                    if token:
-                        streamed_synthesis = True
-                        yield f"data: {json.dumps({'chunk': token}, ensure_ascii=False)}\n\n"
-                        await asyncio.sleep(0.01)
-
-            # Capture final graph output
-            if kind == "on_chain_end":
-                output = event.get("data", {}).get("output", {})
-                if isinstance(output, dict) and "answer" in output:
-                    final_state = output
+                # Capture final graph output
+                if kind == "on_chain_end":
+                    output = event.get("data", {}).get("output", {})
+                    if isinstance(output, dict) and "answer" in output:
+                        final_state = output
 
     except Exception as e:
         logger.error(f"CRAG graph execution failed: {e}", exc_info=True)

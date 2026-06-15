@@ -17,6 +17,7 @@ import logging
 from pathlib import Path
 import json
 import os
+from typing import Optional
 
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
@@ -175,6 +176,7 @@ def get_translated(endpoint: str, original_data, lang: str, context_hint: str = 
 class ChatRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000, description="User's question")
     language: str = Field(default="en", description="User's selected language")
+    session_id: Optional[str] = Field(default=None, description="Session UUID for conversation memory")
 
 
 class ChatResponse(BaseModel):
@@ -195,12 +197,12 @@ async def chat_endpoint(request: Request, chat_request: ChatRequest):
     Routes the query to specialized agents, retrieves context (and live web search),
     and streams the synthesized answer via Server-Sent Events (SSE).
     """
-    logger.info(f"Chat request: {chat_request.query[:80]}... Language: {chat_request.language}")
+    logger.info(f"Chat request: {chat_request.query[:80]}... Language: {chat_request.language} Session: {chat_request.session_id}")
     try:
         lang_full = LANG_MAP.get(chat_request.language, "English")
         
         return StreamingResponse(
-            stream_answer(chat_request.query, language=lang_full),
+            stream_answer(chat_request.query, language=lang_full, session_id=chat_request.session_id),
             media_type="text/event-stream"
         )
     except Exception as e:

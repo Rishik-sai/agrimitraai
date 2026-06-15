@@ -5,6 +5,7 @@ langchain-community==0.4.1
 langchain-text-splitters==1.1.2
 langchain-groq==1.1.2
 langgraph
+langgraph-checkpoint-sqlite
 faiss-cpu==1.13.2
 sentence-transformers==5.5.1
 python-dotenv==1.2.2

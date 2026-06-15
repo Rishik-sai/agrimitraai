@@ -9,6 +9,15 @@ const SUGGESTIONS = [
   "Best storage practices for cotton",
 ];
 
+function getSessionId() {
+  let id = localStorage.getItem('agrimitra_session_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('agrimitra_session_id', id);
+  }
+  return id;
+}
+
 function Chat({ activeAgent, t, language, locale }) {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState([]);
@@ -40,7 +49,7 @@ function Chat({ activeAgent, t, language, locale }) {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: messageText, language: language })
+        body: JSON.stringify({ query: messageText, language: language, session_id: getSessionId() })
       });
 
       if (!response.ok) {
