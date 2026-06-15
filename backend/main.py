@@ -19,12 +19,21 @@ import json
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, UploadFile, File
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 # Load environment variables
 load_dotenv()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key or api_key == "your_key_here":
+        logger.error("GROQ_API_KEY environment variable is not set. Failing fast.")
+        raise RuntimeError("GROQ_API_KEY environment variable is missing.")
+    yield
 
 # Configure logging
 logging.basicConfig(
@@ -34,22 +43,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import the Multi-RAG engine
-from multi_rag import get_all_agents
+from multi_rag import get_all_agents, stream_answer
 
 app = FastAPI(
     title="AgriMitra AI Pro",
     description="Multi-RAG Agricultural Intelligence System",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
 # CORS for local development
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[FRONTEND_URL, "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # ---------------------------------------------------------------------------
@@ -170,20 +189,18 @@ from fastapi.responses import StreamingResponse
 # Chat Endpoint (Multi-RAG with Streaming)
 # ---------------------------------------------------------------------------
 @app.post("/api/chat")
-async def chat_endpoint(request: ChatRequest):
+@limiter.limit("10/minute")
+async def chat_endpoint(request: Request, chat_request: ChatRequest):
     """Handle a chat query using the Multi-RAG pipeline.
     Routes the query to specialized agents, retrieves context (and live web search),
     and streams the synthesized answer via Server-Sent Events (SSE).
     """
-    logger.info(f"Chat request: {request.query[:80]}... Language: {request.language}")
+    logger.info(f"Chat request: {chat_request.query[:80]}... Language: {chat_request.language}")
     try:
-        lang_full = LANG_MAP.get(request.language, "English")
-        
-        # We must import stream_answer here or at top level
-        from multi_rag import stream_answer
+        lang_full = LANG_MAP.get(chat_request.language, "English")
         
         return StreamingResponse(
-            stream_answer(request.query, language=lang_full),
+            stream_answer(chat_request.query, language=lang_full),
             media_type="text/event-stream"
         )
     except Exception as e:
@@ -377,8 +394,11 @@ async def schemes_data(lang: str = Query(default="en")):
 # ---------------------------------------------------------------------------
 @app.get("/api/weather/{state}/{city}")
 async def weather_data(state: str, city: str, lang: str = Query(default="en")):
-    """Return weather and risk data for a given state and city using Groq API."""
-    api_key = os.getenv("GROQ_API_KEY")
+    """Return weather and risk data for a given state and city using OpenWeatherMap and Groq API."""
+    import httpx
+    
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    owm_api_key = os.getenv("OPENWEATHER_API_KEY")
     lang_full = LANG_MAP.get(lang, "English")
 
     fallback_data = {
@@ -391,36 +411,92 @@ async def weather_data(state: str, city: str, lang: str = Query(default="en")):
         "suggested_crops": ["Paddy", "Maize", "Cotton"]
     }
 
-    if not api_key:
-        logger.warning("GROQ_API_KEY not set. Returning fallback weather data.")
+    if not owm_api_key:
+        logger.warning("OPENWEATHER_API_KEY not set. Returning fallback weather data.")
         if lang != "en":
             return get_translated(f"weather_fallback_{city}", fallback_data, lang, "weather advisory for farmers")
         return fallback_data
+
+    # Fetch real data from OpenWeatherMap
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/forecast?q={city},{state},IN&appid={owm_api_key}&units=metric"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            
+        if response.status_code != 200:
+            # Fallback to just city and IN if state+city fails
+            url = f"https://api.openweathermap.org/data/2.5/forecast?q={city},IN&appid={owm_api_key}&units=metric"
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url)
+                
+        if response.status_code != 200:
+            logger.error(f"OpenWeatherMap API error: {response.text}")
+            return fallback_data
+
+        owm_data = response.json()
+        current = owm_data["list"][0]
+        
+        temp = f"{round(current['main']['temp'])}°C"
+        humidity = f"{current['main']['humidity']}%"
+        wind = f"{round(current['wind']['speed'] * 3.6)} km/h"
+        condition = current['weather'][0]['description'].title()
+        
+        # Get 5 day forecast (every 24 hours / 8 indices)
+        forecast_list = []
+        for i in range(0, 40, 8):
+            if i < len(owm_data["list"]):
+                f = owm_data["list"][i]
+                forecast_list.append(f"{round(f['main']['temp'])}°C / {f['weather'][0]['description'].title()}")
+
+        base_weather = {
+            "district": city,
+            "temp": temp,
+            "humidity": humidity,
+            "wind": wind,
+            "condition": condition,
+            "forecast": forecast_list
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch from OpenWeatherMap: {e}")
+        return fallback_data
+
+    # Now use LLM to generate agricultural advisory based on REAL weather
+    if not groq_api_key:
+        logger.warning("GROQ_API_KEY not set. Returning generic advisory.")
+        base_weather["risk"] = fallback_data["risk"]
+        base_weather["advisory"] = fallback_data["advisory"]
+        base_weather["suggested_crops"] = fallback_data["suggested_crops"]
+        if lang != "en":
+            return get_translated(f"weather_real_{city}", base_weather, lang, "weather advisory for farmers")
+        return base_weather
 
     try:
         from langchain_groq import ChatGroq
         llm = ChatGroq(
             model_name=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-            groq_api_key=api_key,
+            groq_api_key=groq_api_key,
             temperature=0.3,
         )
 
         lang_instruction = ""
         if lang != "en":
-            lang_instruction = f"\nIMPORTANT: ALL string values in the JSON must be written in {lang_full} language. Keep numbers, units (°C, km/h, %), and JSON keys in English."
+            lang_instruction = f"\nIMPORTANT: ALL string values in the JSON must be written in {lang_full} language. Keep JSON keys in English."
 
-        prompt = f"""You are an agricultural meteorologist. Generate a realistic 5-day weather forecast for {city}, {state}, India, typical for the current season. 
+        prompt = f"""You are an agricultural meteorologist. I have the actual real-time weather forecast for {city}, {state}, India:
+Temperature: {temp}
+Humidity: {humidity}
+Wind: {wind}
+Condition: {condition}
+5-Day Forecast: {', '.join(forecast_list)}
+
+Based on this REAL data, provide an agricultural risk assessment, farmer advisory, and suggested crops.
 Output ONLY valid JSON with no markdown formatting or extra text.{lang_instruction}
 
 Required JSON structure:
 {{
-  "temp": "string (e.g., '32°C')",
-  "humidity": "string (e.g., '70%')",
-  "wind": "string (e.g., '12 km/h')",
-  "condition": "string (e.g., 'Partly Cloudy')",
-  "risk": "string (brief sentence about weather risks to crops)",
-  "advisory": "string (brief advisory for farmers based on the weather)",
-  "forecast": ["string", "string", "string", "string", "string"],
+  "risk": "string (brief sentence about weather risks to crops based on the provided weather)",
+  "advisory": "string (brief advisory for farmers based on the provided weather)",
   "suggested_crops": ["Crop Name 1", "Crop Name 2", "Crop Name 3"]
 }}"""
         response = llm.invoke(prompt)
@@ -430,21 +506,30 @@ Required JSON structure:
         elif content.startswith("```"):
             content = content[3:-3].strip()
             
-        data = json.loads(content)
-        data["district"] = city
-        return data
+        llm_data = json.loads(content)
+        base_weather.update(llm_data)
+        return base_weather
         
     except Exception as e:
-        logger.error(f"Weather Groq API error: {e}", exc_info=True)
-        return fallback_data
+        logger.error(f"Weather advisory Groq API error: {e}", exc_info=True)
+        base_weather["risk"] = fallback_data["risk"]
+        base_weather["advisory"] = fallback_data["advisory"]
+        base_weather["suggested_crops"] = fallback_data["suggested_crops"]
+        return base_weather
 
 
 # ---------------------------------------------------------------------------
 # Leaf Scan (Groq Vision)
 # ---------------------------------------------------------------------------
 @app.post("/api/scan")
-async def scan_endpoint(file: UploadFile = File(...), lang: str = Query(default="en")):
+@limiter.limit("5/minute")
+async def scan_endpoint(request: Request, file: UploadFile = File(...), lang: str = Query(default="en")):
     """Analyze uploaded leaf image using Groq Vision model and return diagnosis and remedies."""
+    # 6. File type validation
+    allowed_types = ["image/jpeg", "image/png", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Only JPEG, PNG, and WebP are allowed.")
+        
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         logger.warning("GROQ_API_KEY not set. Returning mock scan results.")
@@ -471,6 +556,10 @@ async def scan_endpoint(file: UploadFile = File(...), lang: str = Query(default=
         contents = await file.read()
         if not contents:
             raise HTTPException(status_code=400, detail="Empty file uploaded.")
+            
+        # 7. File size limit (10MB)
+        if len(contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
             
         import base64
         encoded = base64.b64encode(contents).decode("utf-8")
