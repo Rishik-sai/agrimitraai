@@ -71,20 +71,26 @@ def _init_components():
         return  # Already initialized
 
     try:
+        import torch
+        torch.set_num_threads(1)  # Reduce memory usage on Render's 512MB free tier
         from langchain_community.embeddings import HuggingFaceEmbeddings
-        EMBEDDINGS = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
+        EMBEDDINGS = HuggingFaceEmbeddings(
+            model_name=EMBEDDING_MODEL_NAME,
+            model_kwargs={'device': 'cpu'}
+        )
         logger.info(f"Loaded embedding model: {EMBEDDING_MODEL_NAME}")
     except Exception as e:
         logger.error(f"Failed to load embeddings: {e}")
         return
 
     if CROSS_ENCODER is None:
-        try:
-            from sentence_transformers import CrossEncoder
-            CROSS_ENCODER = CrossEncoder(CROSS_ENCODER_MODEL_NAME)
-            logger.info(f"Loaded CrossEncoder model: {CROSS_ENCODER_MODEL_NAME}")
-        except Exception as e:
-            logger.error(f"Failed to load CrossEncoder: {e}")
+        pass # Disabled to save memory on Render's 512MB free tier
+        # try:
+        #     from sentence_transformers import CrossEncoder
+        #     CROSS_ENCODER = CrossEncoder(CROSS_ENCODER_MODEL_NAME)
+        #     logger.info(f"Loaded CrossEncoder model: {CROSS_ENCODER_MODEL_NAME}")
+        # except Exception as e:
+        #     logger.error(f"Failed to load CrossEncoder: {e}")
 
     # Load FAISS index
     if FAISS_INDEX_PATH.exists():

@@ -79,7 +79,12 @@ def split_documents(docs, chunk_size=800, chunk_overlap=150):
 def create_vector_store(chunks):
     """Create a FAISS vector store from document chunks and save to disk."""
     logger.info(f"Creating embeddings with model: {EMBEDDING_MODEL_NAME}")
-    embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
+    import torch
+    torch.set_num_threads(1)
+    embedding_model = HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL_NAME,
+        model_kwargs={'device': 'cpu'}
+    )
 
     logger.info("Building FAISS index...")
     vectordb = FAISS.from_documents(chunks, embedding_model)
