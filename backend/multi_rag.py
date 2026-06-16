@@ -53,7 +53,7 @@ class AgriState(TypedDict):
 # Configuration
 # ---------------------------------------------------------------------------
 FAISS_INDEX_PATH = Path(__file__).parent / "faiss_index"
-EMBEDDING_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
+EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 CROSS_ENCODER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 LLM_AVAILABLE = False

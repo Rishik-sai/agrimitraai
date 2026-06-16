@@ -22,8 +22,8 @@ DOCS_DIR = Path(__file__).parent / "data" / "docs"
 # Persisted FAISS index location
 FAISS_INDEX_PATH = Path(__file__).parent / "faiss_index"
 
-# Embedding model — multilingual for broad language support
-EMBEDDING_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
+# Embedding model — switched to a smaller English-centric model to fit Render 512MB limit
+EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
 
 def load_documents() -> List:
