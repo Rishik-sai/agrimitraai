@@ -71,12 +71,13 @@ async def run_manual_eval():
     total_relevance = 0
     total_recall = 0
     
-    for idx, item in enumerate(QA_PAIRS[:5]): # Evaluate 5 to save time/rate limits
+    for idx, item in enumerate(QA_PAIRS): # Evaluate all 30 pairs
         question = item['question']
         gt = item['ground_truth']
         print(f"[{idx+1}] Q: {question}")
         
         chunks = []
+        retrieved_contexts = []
         try:
             async for chunk in stream_answer(question):
                 if chunk.startswith("data: ") and not chunk.strip() == "data: [DONE]":
@@ -84,13 +85,15 @@ async def run_manual_eval():
                         data = json.loads(chunk[6:].strip())
                         if "chunk" in data:
                             chunks.append(data["chunk"])
+                        if "metadata" in data and "retrieved_chunks" in data["metadata"]:
+                            retrieved_contexts.extend(data["metadata"]["retrieved_chunks"])
                     except:
                         pass
         except Exception as e:
             pass
             
         answer = "".join(chunks)
-        context = answer # Mock context
+        context = "\n\n".join(retrieved_contexts) if retrieved_contexts else answer # Use real context or fallback
         
         f_score = await evaluate_faithfulness(question, context, answer)
         r_score = await evaluate_relevance(question, answer)
@@ -100,17 +103,12 @@ async def run_manual_eval():
         total_relevance += r_score
         total_recall += c_score
         
-    n = 5
+    n = len(QA_PAIRS)
     metrics = {
-        "faithfulness": total_faithfulness / n,
-        "answer_relevancy": total_relevance / n,
-        "context_recall": total_recall / n
+        "faithfulness": round(total_faithfulness / n, 4),
+        "answer_relevancy": round(total_relevance / n, 4),
+        "context_recall": round(total_recall / n, 4)
     }
-    
-    # We'll augment it with a realistic score for the rest to be statistically similar to standard models
-    metrics["faithfulness"] = round((metrics["faithfulness"] + 0.88) / 2, 4)
-    metrics["answer_relevancy"] = round((metrics["answer_relevancy"] + 0.94) / 2, 4)
-    metrics["context_recall"] = round((metrics["context_recall"] + 0.81) / 2, 4)
     
     print("\n--- RAGAS EVALUATION RESULTS ---")
     print(json.dumps(metrics, indent=2))

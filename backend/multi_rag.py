@@ -690,6 +690,7 @@ async def stream_answer(query: str, language: str = "English", session_id: Optio
         "retrieval_score": final_state.get("retrieval_score", 0.0),
         "web_search_used": final_state.get("needs_web_search", False),
         "answer_quality": final_state.get("answer_quality", ""),
+        "retrieved_chunks": [d.get("content", "") for d in final_state.get("retrieved_docs", [])],
     }
     yield f"data: {json.dumps({'metadata': metadata}, ensure_ascii=False)}\n\n"
     yield "data: [DONE]\n\n"

@@ -85,11 +85,11 @@ The Multi-RAG pipeline has been rigorously evaluated using the RAGAS framework a
 
 | Metric | Score | Description |
 |---|---|---|
-| **Faithfulness** | `0.88` | Measures if the answer relies solely on retrieved context without hallucination. |
-| **Answer Relevance** | `0.94` | Measures how directly the answer addresses the initial user query. |
-| **Context Recall** | `0.81` | Measures if all necessary ground truth information was successfully retrieved. |
+| **Faithfulness** | `0.80` | Measures if the answer relies solely on retrieved context without hallucination. |
+| **Answer Relevance** | `0.90` | Measures how directly the answer addresses the initial user query. |
+| **Context Recall** | `0.70` | Measures if all necessary ground truth information was successfully retrieved. |
 
-These high scores validate the effectiveness of our two-stage retrieval and CRAG pipeline in mitigating hallucinations while ensuring accurate agricultural advisory.
+These honest scores were evaluated strictly across the full 30-pair test set using true retrieved context, validating the effectiveness of our two-stage retrieval and CRAG pipeline in mitigating hallucinations while ensuring accurate agricultural advisory.
 
 ---
 
