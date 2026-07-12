@@ -50,6 +50,12 @@ export default function AgentGrid({ t, language }) {
   const handleClick = (agentId) => {
     if (agentId === 'leaf_scanner') {
       navigate('/scanner');
+    } else if (agentId === 'market_analyst') {
+      navigate('/market');
+    } else if (agentId === 'schemes_expert') {
+      navigate('/schemes');
+    } else if (agentId === 'weather_analyst') {
+      navigate('/weather');
     } else {
       navigate(`/chat/${agentId}`);
     }

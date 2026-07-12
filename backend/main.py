@@ -357,19 +357,20 @@ async def _get_market_data():
                 data = response.json()
                 records = data.get("records", [])
                 if records:
-                    results = {}
+                    results = []
                     for rec in records[:10]:
                         crop = rec.get("commodity", "Unknown").title()
                         min_price = rec.get("min_price", 0)
                         max_price = rec.get("max_price", 0)
-                        results[crop] = {
+                        results.append({
+                            "crop": crop,
                             "currentRange": f"₹{min_price} – ₹{max_price}",
                             "msp": None,
                             "unit": "per Quintal",
                             "demand": "Unknown",
                             "trend": "stable",
                             "change": "0%",
-                        }
+                        })
                     return results
         except Exception as e:
             logger.error(f"Failed to fetch real market data API: {e}")
@@ -387,8 +388,9 @@ async def _get_market_data():
         logger.warning(f"Agmarknet scraper attempt failed: {e}")
 
     logger.info("Returning fallback mock market data.")
-    return {
-        "Paddy": {
+    return [
+        {
+            "crop": "Paddy",
             "currentRange": "₹2,100 – ₹2,450",
             "msp": 2183,
             "unit": "per Quintal",
@@ -396,7 +398,8 @@ async def _get_market_data():
             "trend": "up",
             "change": "+3.2%",
         },
-        "Cotton": {
+        {
+            "crop": "Cotton",
             "currentRange": "₹6,800 – ₹7,500",
             "msp": 6620,
             "unit": "per Quintal",
@@ -404,7 +407,8 @@ async def _get_market_data():
             "trend": "stable",
             "change": "+0.8%",
         },
-        "Chillies": {
+        {
+            "crop": "Chillies",
             "currentRange": "₹16,000 – ₹22,000",
             "msp": 7000,
             "unit": "per Quintal",
@@ -412,7 +416,8 @@ async def _get_market_data():
             "trend": "up",
             "change": "+5.1%",
         },
-        "Groundnut": {
+        {
+            "crop": "Groundnut",
             "currentRange": "₹6,500 – ₹7,200",
             "msp": 6377,
             "unit": "per Quintal",
@@ -420,7 +425,8 @@ async def _get_market_data():
             "trend": "down",
             "change": "-1.4%",
         },
-        "Maize": {
+        {
+            "crop": "Maize",
             "currentRange": "₹2,100 – ₹2,350",
             "msp": 2090,
             "unit": "per Quintal",
@@ -428,7 +434,8 @@ async def _get_market_data():
             "trend": "stable",
             "change": "+0.3%",
         },
-        "Wheat": {
+        {
+            "crop": "Wheat",
             "currentRange": "₹2,200 – ₹2,500",
             "msp": 2275,
             "unit": "per Quintal",
@@ -436,7 +443,8 @@ async def _get_market_data():
             "trend": "up",
             "change": "+2.7%",
         },
-        "Turmeric": {
+        {
+            "crop": "Turmeric",
             "currentRange": "₹12,000 – ₹15,500",
             "msp": None,
             "unit": "per Quintal",
@@ -444,7 +452,7 @@ async def _get_market_data():
             "trend": "up",
             "change": "+8.3%",
         },
-    }
+    ]
 
 
 @app.get("/api/market")

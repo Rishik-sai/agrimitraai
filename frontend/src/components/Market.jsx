@@ -68,10 +68,10 @@ export default function Market({ t, language }) {
           initial="hidden"
           animate="show"
         >
-          {Object.entries(data).map(([crop, info]) => (
-            <motion.div key={crop} variants={itemVariants} className="glass-panel" style={{ padding: '30px' }}>
+          {(Array.isArray(data) ? data : Object.entries(data).map(([crop, info]) => ({ crop, ...info }))).map((info, idx) => (
+            <motion.div key={idx} variants={itemVariants} className="glass-panel" style={{ padding: '30px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{crop}</h3>
+                <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{info.crop}</h3>
                 <span className={`demand-badge demand-${info.demand?.toLowerCase() || 'medium'}`} style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>
                   {info.demand} Demand
                 </span>
