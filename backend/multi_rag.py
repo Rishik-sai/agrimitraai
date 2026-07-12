@@ -73,7 +73,7 @@ def _init_components():
     try:
         import torch
         torch.set_num_threads(1)  # Reduce memory usage on Render's 512MB free tier
-        from langchain_community.embeddings import HuggingFaceEmbeddings
+        from langchain_huggingface import HuggingFaceEmbeddings
         EMBEDDINGS = HuggingFaceEmbeddings(
             model_name=EMBEDDING_MODEL_NAME,
             model_kwargs={'device': 'cpu'}
