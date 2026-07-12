@@ -8,8 +8,8 @@ export default function Layout({ t, language, setLanguage }) {
 
   const navItems = [
     { path: '/', icon: <Home size={24} />, label: t.agentsAll || 'Home' },
-    { path: '/chat', icon: <MessageSquare size={24} />, label: 'Chat' },
-    { path: '/scanner', icon: <Scan size={24} />, label: 'Scanner' },
+    { path: '/chat', icon: <MessageSquare size={24} />, label: t.chatPanel || 'Chat' },
+    { path: '/scanner', icon: <Scan size={24} />, label: t.scannerPanel || 'Scanner' },
     { path: '/market', icon: <BarChart2 size={24} />, label: t.marketPanel || 'Market' },
     { path: '/weather', icon: <Cloud size={24} />, label: t.weatherPanel || 'Weather' },
     { path: '/schemes', icon: <BookOpen size={24} />, label: t.schemesPanel || 'Schemes' },

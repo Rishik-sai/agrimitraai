@@ -198,14 +198,14 @@ function Chat({ activeAgent, t, language, locale }) {
     <div className="chat-container">
       <div className="chat-header">
         <h2 className="chat-title">💬 {t?.agentsAll || "Chat Assistant"}</h2>
-        <span className="chat-badge">Multi-RAG (Live Data)</span>
+        <span className="chat-badge">{t?.chatBadge || 'Multi-RAG (Live Data)'}</span>
       </div>
 
       <div className="messages">
         {messages.length === 0 && (
           <div className="welcome-message">
             <div className="welcome-emoji">🌾</div>
-            <h3 className="welcome-title">Welcome to AgriMitra AI</h3>
+            <h3 className="welcome-title">{t?.chatWelcome || 'Welcome to AgriMitra AI'}</h3>
             <p className="welcome-text">
               {t?.chatSelectAgent || "Ask me anything about crops, market prices, government schemes, weather, or plant diseases. I'll route your question to the right expert agents and search the web for live data if needed."}
             </p>

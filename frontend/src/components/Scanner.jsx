@@ -111,7 +111,7 @@ function Scanner({ t, language }) {
     >
       <div className="page-header">
         <h1 className="page-title"><ScanLine size={32} className="inline-icon" /> {t.scannerPanel || 'Crop Disease Scanner'}</h1>
-        <p className="page-subtitle">Upload an image of a leaf to instantly identify diseases and get remedies.</p>
+        <p className="page-subtitle">{t?.scannerSubtitle || 'Upload an image of a leaf to instantly identify diseases and get remedies.'}</p>
       </div>
 
       <div className="scanner-layout">
@@ -156,7 +156,7 @@ function Scanner({ t, language }) {
                         transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                       />
                       <div className="scanner-overlay-text pulsing">
-                        <ScanLine className="spin-slow" /> Analyzing Crop Data...
+                        <ScanLine className="spin-slow" /> {t?.scannerAnalyzingCrop || 'Analyzing Crop Data...'}
                       </div>
                     </motion.div>
                   )}
@@ -175,9 +175,9 @@ function Scanner({ t, language }) {
                   >
                     <UploadCloud size={64} className="upload-icon" />
                   </motion.div>
-                  <h3>Drag & Drop Leaf Image</h3>
-                  <p>or click to browse from your device</p>
-                  <span className="file-hint">Supports JPG, PNG (Max 10MB)</span>
+                  <h3>{t?.scannerDragDrop || 'Drag & Drop Leaf Image'}</h3>
+                  <p>{t?.scannerBrowse || 'or click to browse from your device'}</p>
+                  <span className="file-hint">{t?.scannerFileHint || 'Supports JPG, PNG (Max 10MB)'}</span>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -190,7 +190,7 @@ function Scanner({ t, language }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              Scan Another Leaf
+              {t?.scannerScanAnother || 'Scan Another Leaf'}
             </motion.button>
           )}
         </div>
@@ -225,23 +225,23 @@ function Scanner({ t, language }) {
                     style={{ backgroundColor: `${getSeverityColor(result.severity)}20`, color: getSeverityColor(result.severity) }}
                   >
                     {result.severity === 'High' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-                    {result.severity} Severity
+                    {result.severity} {t?.scannerSeverity || 'Severity'}
                   </span>
                 </div>
                 
                 <div className="results-metrics">
                   <div className="metric-box">
-                    <span className="metric-label">Confidence</span>
+                    <span className="metric-label">{t?.scannerConfidence || 'Confidence'}</span>
                     <span className="metric-value">{result.confidence}%</span>
                   </div>
                   <div className="metric-box">
-                    <span className="metric-label">Affected Area</span>
+                    <span className="metric-label">{t?.scannerAffectedArea || 'Affected Area'}</span>
                     <span className="metric-value">{result.affected_area || 'Unknown'}</span>
                   </div>
                 </div>
 
                 <div className="results-recommendations">
-                  <h3><Leaf size={18} /> Recommended Actions</h3>
+                  <h3><Leaf size={18} /> {t?.scannerRecommendedActions || 'Recommended Actions'}</h3>
                   <ul>
                     {(result.recommendations || []).map((rec, i) => (
                       <motion.li 
@@ -264,7 +264,7 @@ function Scanner({ t, language }) {
                 className="glass-panel results-placeholder empty"
               >
                 <Leaf size={48} className="empty-icon" />
-                <p>Upload a leaf image to see detailed AI analysis and targeted remedies.</p>
+                <p>{t?.scannerEmptyState || 'Upload a leaf image to see detailed AI analysis and targeted remedies.'}</p>
               </motion.div>
             )}
           </AnimatePresence>

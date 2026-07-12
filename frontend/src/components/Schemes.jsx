@@ -33,7 +33,7 @@ export default function Schemes({ t, language }) {
         </div>
         <div className="error-state glass-panel" style={{ padding: '40px', textAlign: 'center' }}>
           <div className="error-emoji" style={{ fontSize: '3rem' }}>🏛️</div>
-          <p>Unable to load schemes. Start the backend server.</p>
+          <p>{t?.schemesError || 'Unable to load schemes. Start the backend server.'}</p>
         </div>
       </motion.div>
     );
@@ -48,7 +48,7 @@ export default function Schemes({ t, language }) {
     >
       <div className="page-header">
         <h1 className="page-title"><BookOpen className="inline-icon" /> {t.schemesPanel || 'Govt Schemes'}</h1>
-        <p className="page-subtitle">Discover subsidies, financial support, and welfare programs for farmers.</p>
+        <p className="page-subtitle">{t?.schemesSubtitle || 'Discover subsidies, financial support, and welfare programs for farmers.'}</p>
       </div>
 
       {!data ? (
@@ -81,7 +81,7 @@ export default function Schemes({ t, language }) {
               </p>
               
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '12px', marginBottom: '20px' }}>
-                <strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)' }}>Eligibility:</strong>
+                <strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)' }}>{t?.schemesEligibility || 'Eligibility:'}</strong>
                 <span style={{ color: 'var(--text-main)' }}>{scheme.eligibility}</span>
               </div>
               
@@ -99,7 +99,7 @@ export default function Schemes({ t, language }) {
                   padding: '10px 0'
                 }}
               >
-                Apply / Learn More <ExternalLink size={16} />
+                {t?.schemesApply || 'Apply / Learn More'} <ExternalLink size={16} />
               </a>
             </motion.div>
           ))}

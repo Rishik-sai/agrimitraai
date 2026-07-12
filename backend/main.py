@@ -15,8 +15,12 @@ Serves the React frontend static files in production.
 
 import logging
 from pathlib import Path
-import json
 import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+
+import json
 from typing import Optional
 
 from dotenv import load_dotenv

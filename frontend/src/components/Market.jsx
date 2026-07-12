@@ -33,7 +33,7 @@ export default function Market({ t, language }) {
         </div>
         <div className="error-state glass-panel" style={{ padding: '40px', textAlign: 'center' }}>
           <div className="error-emoji" style={{ fontSize: '3rem' }}>📡</div>
-          <p>Unable to load market data. Start the backend server.</p>
+          <p>{t?.marketError || 'Unable to load market data. Start the backend server.'}</p>
         </div>
       </motion.div>
     );
@@ -48,7 +48,7 @@ export default function Market({ t, language }) {
     >
       <div className="page-header">
         <h1 className="page-title"><BarChart2 className="inline-icon" /> {t.marketPanel || 'Market Prices'}</h1>
-        <p className="page-subtitle">Real-time mandi prices, MSP, and demand trends for your crops.</p>
+        <p className="page-subtitle">{t?.marketSubtitle || 'Real-time mandi prices, MSP, and demand trends for your crops.'}</p>
       </div>
 
       {!data ? (
@@ -73,7 +73,7 @@ export default function Market({ t, language }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{info.crop}</h3>
                 <span className={`demand-badge demand-${info.demand?.toLowerCase() || 'medium'}`} style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                  {info.demand} Demand
+                  {info.demand} {t?.demandLabel || 'Demand'}
                 </span>
               </div>
               

@@ -71,14 +71,17 @@ def _init_components():
         return  # Already initialized
 
     try:
+        import gc
         import torch
         torch.set_num_threads(1)  # Reduce memory usage on Render's 512MB free tier
+        torch.set_grad_enabled(False)  # Completely disable gradients to save RAM
         from langchain_huggingface import HuggingFaceEmbeddings
         EMBEDDINGS = HuggingFaceEmbeddings(
             model_name=EMBEDDING_MODEL_NAME,
             model_kwargs={'device': 'cpu'}
         )
         logger.info(f"Loaded embedding model: {EMBEDDING_MODEL_NAME}")
+        gc.collect()
     except Exception as e:
         logger.error(f"Failed to load embeddings: {e}")
         return

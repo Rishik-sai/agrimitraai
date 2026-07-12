@@ -66,20 +66,20 @@ export default function Weather({ t, language }) {
     >
       <div className="page-header">
         <h1 className="page-title"><Cloud className="inline-icon" /> {t.weatherPanel || 'Weather Advisory'}</h1>
-        <p className="page-subtitle">Get hyper-local weather risk assessments and crop suggestions.</p>
+        <p className="page-subtitle">{t?.weatherSubtitle || 'Get hyper-local weather risk assessments and crop suggestions.'}</p>
       </div>
 
       <div className="glass-panel" style={{ padding: '30px', marginBottom: '40px' }}>
         <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '250px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)' }}><MapPin size={16} style={{ display: 'inline', verticalAlign: 'text-bottom' }}/> Select State</label>
+            <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)' }}><MapPin size={16} style={{ display: 'inline', verticalAlign: 'text-bottom' }}/> {t?.weatherSelectState || 'Select State'}</label>
             <select
               className="lang-select"
               value={selectedState}
               onChange={handleStateChange}
               style={{ width: '100%', padding: '12px', fontSize: '1rem' }}
             >
-              <option value="" disabled>Select State...</option>
+              <option value="" disabled>{t?.weatherSelectStatePlaceholder || 'Select State...'}</option>
               {Object.keys(FARMING_LOCATIONS).map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
@@ -87,7 +87,7 @@ export default function Weather({ t, language }) {
           </div>
 
           <div style={{ flex: 1, minWidth: '250px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)' }}><MapPin size={16} style={{ display: 'inline', verticalAlign: 'text-bottom' }}/> Select District/City</label>
+            <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)' }}><MapPin size={16} style={{ display: 'inline', verticalAlign: 'text-bottom' }}/> {t?.weatherSelectDistrict || 'Select District/City'}</label>
             <select
               className="lang-select"
               value={city}
@@ -95,7 +95,7 @@ export default function Weather({ t, language }) {
               disabled={!selectedState}
               style={{ width: '100%', padding: '12px', fontSize: '1rem', opacity: !selectedState ? 0.5 : 1 }}
             >
-              <option value="" disabled>Select District/City...</option>
+              <option value="" disabled>{t?.weatherSelectDistrictPlaceholder || 'Select District/City...'}</option>
               {selectedState && FARMING_LOCATIONS[selectedState].map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -132,12 +132,12 @@ export default function Weather({ t, language }) {
               <div style={{ display: 'flex', gap: '20px' }}>
                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', minWidth: '120px', textAlign: 'center' }}>
                   <Droplets size={32} color="#3b82f6" style={{ margin: '0 auto 10px' }} />
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Humidity</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t?.weatherHumidity || 'Humidity'}</div>
                   <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>{data.humidity}</div>
                 </div>
                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', minWidth: '120px', textAlign: 'center' }}>
                   <Wind size={32} color="#10b981" style={{ margin: '0 auto 10px' }} />
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Wind</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t?.weatherWind || 'Wind'}</div>
                   <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>{data.wind}</div>
                 </div>
               </div>
@@ -146,7 +146,7 @@ export default function Weather({ t, language }) {
             <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '20px', borderRadius: '16px' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ef4444', marginBottom: '10px' }}>
-                  <AlertTriangle size={20} /> Weather Risk
+                  <AlertTriangle size={20} /> {t?.weatherRisk || 'Weather Risk'}
                 </h3>
                 <p style={{ color: 'var(--text-main)' }}>{data.risk}</p>
               </div>
@@ -154,7 +154,7 @@ export default function Weather({ t, language }) {
               {data.advisory && (
                 <div style={{ flex: 2, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '20px', borderRadius: '16px' }}>
                   <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#3b82f6', marginBottom: '10px' }}>
-                    <Lightbulb size={20} /> Advisory
+                    <Lightbulb size={20} /> {t?.weatherAdvisory || 'Advisory'}
                   </h3>
                   <p style={{ color: 'var(--text-main)', lineHeight: '1.6' }}>{data.advisory}</p>
                 </div>
@@ -163,7 +163,7 @@ export default function Weather({ t, language }) {
 
             {data.suggested_crops && data.suggested_crops.length > 0 && (
               <div>
-                <h3 style={{ marginBottom: '15px' }}>🌱 Suggested Crops for Current Conditions</h3>
+                <h3 style={{ marginBottom: '15px' }}>{t?.weatherSuggestedCrops || '🌱 Suggested Crops for Current Conditions'}</h3>
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   {data.suggested_crops.map((crop, i) => (
                     <span key={i} style={{
@@ -183,8 +183,8 @@ export default function Weather({ t, language }) {
         ) : (
           <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-panel" style={{ padding: '60px', textAlign: 'center' }}>
             <Cloud size={64} style={{ color: 'var(--text-muted)', marginBottom: '20px', opacity: 0.5 }} />
-            <h2 style={{ color: 'var(--text-secondary)' }}>Select a location</h2>
-            <p style={{ color: 'var(--text-muted)' }}>Choose your state and district to view hyper-local weather data.</p>
+            <h2 style={{ color: 'var(--text-secondary)' }}>{t?.weatherSelectLocation || 'Select a location'}</h2>
+            <p style={{ color: 'var(--text-muted)' }}>{t?.weatherSelectLocationDesc || 'Choose your state and district to view hyper-local weather data.'}</p>
           </motion.div>
         )}
       </AnimatePresence>

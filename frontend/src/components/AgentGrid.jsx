@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 const FALLBACK_AGENTS = [
-  { id: 'crop_advisor', name: 'Crop Advisor', emoji: '🌾', description: 'Diseases, pests, remedies & cultivation' },
-  { id: 'market_analyst', name: 'Market Analyst', emoji: '📊', description: 'MSP, mandi prices & demand trends' },
-  { id: 'schemes_expert', name: 'Schemes Expert', emoji: '🏛️', description: 'Government schemes & subsidies' },
-  { id: 'weather_analyst', name: 'Weather Analyst', emoji: '🌦️', description: 'Weather risks & seasonal planning' },
-  { id: 'leaf_scanner', name: 'Leaf Scanner', emoji: '🔬', description: 'Plant disease identification' },
+  { id: 'crop_advisor', name: 'Crop Advisor', emoji: '🌾', descKey: 'agentDescCrop', description: 'Diseases, pests, remedies & cultivation' },
+  { id: 'market_analyst', name: 'Market Analyst', emoji: '📊', descKey: 'agentDescMarket', description: 'MSP, mandi prices & demand trends' },
+  { id: 'schemes_expert', name: 'Schemes Expert', emoji: '🏛️', descKey: 'agentDescSchemes', description: 'Government schemes & subsidies' },
+  { id: 'weather_analyst', name: 'Weather Analyst', emoji: '🌦️', descKey: 'agentDescWeather', description: 'Weather risks & seasonal planning' },
+  { id: 'leaf_scanner', name: 'Leaf Scanner', emoji: '🔬', descKey: 'agentDescScanner', description: 'Plant disease identification' },
 ];
 
 const containerVariants = {
@@ -70,7 +70,7 @@ export default function AgentGrid({ t, language }) {
         transition={{ duration: 0.6 }}
       >
         <h1 className="page-title">{t.agentsAll || 'Select an AI Agent'}</h1>
-        <p className="page-subtitle">Choose a specialized assistant to help you with your farming needs today.</p>
+        <p className="page-subtitle">{t?.agentGridSubtitle || 'Choose a specialized assistant to help you with your farming needs today.'}</p>
       </motion.div>
 
       <motion.div 
@@ -93,11 +93,11 @@ export default function AgentGrid({ t, language }) {
             <div className="agent-card-header">
               <div className="agent-emoji-large">{agent.emoji}</div>
               <div className="agent-status-indicator">
-                <span className="status-dot pulsing"></span> Online
+                <span className="status-dot pulsing"></span> {t?.agentOnline || 'Online'}
               </div>
             </div>
             <h3 className="agent-name-large">{getTranslatedName(agent.id, agent.name)}</h3>
-            <p className="agent-desc-large">{agent.description}</p>
+            <p className="agent-desc-large">{(agent.descKey && t?.[agent.descKey]) || agent.description}</p>
           </motion.div>
         ))}
       </motion.div>
