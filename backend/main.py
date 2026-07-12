@@ -41,7 +41,13 @@ async def lifespan(app: FastAPI):
     try:
         import redis.asyncio as redis_async
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        REDIS_CLIENT = redis_async.from_url(redis_url, decode_responses=True)
+        
+        # Configure connection kwargs, especially for Render/Upstash rediss:// URLs
+        kwargs = {"decode_responses": True}
+        if redis_url.startswith("rediss://"):
+            kwargs["ssl_cert_reqs"] = "none"
+            
+        REDIS_CLIENT = redis_async.from_url(redis_url, **kwargs)
         await REDIS_CLIENT.ping()
         logger.info("Connected to Redis successfully.")
     except Exception as e:
